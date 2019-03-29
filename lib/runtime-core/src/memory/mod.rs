@@ -11,7 +11,7 @@ use crate::{
 use std::{
     cell::{Cell, RefCell},
     fmt, mem, ptr,
-    rc::Rc,
+    sync::{Arc, Mutex},
 };
 
 pub use self::atomic::Atomic;
@@ -210,7 +210,7 @@ enum UnsharedMemoryStorage {
 }
 
 pub struct UnsharedMemory {
-    internal: Rc<UnsharedMemoryInternal>,
+    internal: Arc<Mutex<UnsharedMemoryInternal>>,
 }
 
 struct UnsharedMemoryInternal {
@@ -237,17 +237,19 @@ impl UnsharedMemory {
         };
 
         Ok(UnsharedMemory {
-            internal: Rc::new(UnsharedMemoryInternal {
+            internal: Arc::new(Mutex::new(UnsharedMemoryInternal {
                 storage: RefCell::new(storage),
                 local: Cell::new(local),
-            }),
+            })),
         })
     }
 
     pub fn grow(&self, delta: Pages) -> Result<Pages, GrowError> {
-        let mut storage = self.internal.storage.borrow_mut();
+        let internal = self.internal.clone();
+        let internal = internal.lock().unwrap();
+        let mut storage = internal.storage.borrow_mut();
 
-        let mut local = self.internal.local.get();
+        let mut local = internal.local.get();
 
         let pages = match &mut *storage {
             UnsharedMemoryStorage::Dynamic(dynamic_memory) => {
@@ -256,13 +258,15 @@ impl UnsharedMemory {
             UnsharedMemoryStorage::Static(static_memory) => static_memory.grow(delta, &mut local),
         };
 
-        self.internal.local.set(local);
+        internal.local.set(local);
 
         pages
     }
 
     pub fn size(&self) -> Pages {
-        let storage = self.internal.storage.borrow();
+        let internal = self.internal.clone();
+        let internal = internal.lock().unwrap();
+        let storage = internal.storage.borrow();
 
         match &*storage {
             UnsharedMemoryStorage::Dynamic(ref dynamic_memory) => dynamic_memory.size(),
@@ -271,14 +275,17 @@ impl UnsharedMemory {
     }
 
     pub(crate) fn vm_local_memory(&self) -> *mut vm::LocalMemory {
-        self.internal.local.as_ptr()
+        let internal = self.internal.clone();
+        let internal = internal.lock().unwrap();
+
+        internal.local.as_ptr()
     }
 }
 
 impl Clone for UnsharedMemory {
     fn clone(&self) -> Self {
         UnsharedMemory {
-            internal: Rc::clone(&self.internal),
+            internal: Arc::clone(&self.internal),
         }
     }
 }
