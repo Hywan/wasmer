@@ -35,6 +35,8 @@ pub mod export;
 pub mod global;
 pub mod import;
 pub mod instance;
+#[cfg(feature = "interface-types")]
+pub mod interface_types;
 pub mod loader;
 pub mod memory;
 pub mod module;

@@ -18,6 +18,7 @@ libc = "0.2.60"
 hex = "0.3"
 smallvec = "0.6"
 bincode = "1.1"
+wasmer-interface-types = { path = "../interface-types", version = "0.7", optional = true }
 
 [dependencies.indexmap]
 version = "1.2"
@@ -58,4 +59,4 @@ backend-cranelift = []
 backend-singlepass = []
 backend-llvm = []
 managed = []
-interface-types = []
+interface-types = ["wasmer-interface-types"]
