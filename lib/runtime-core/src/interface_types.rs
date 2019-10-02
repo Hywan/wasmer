@@ -1,9 +1,23 @@
 use crate as core;
 use std::{collections::HashMap, mem, ops::Deref};
-use wasmer_interface_types::interpreter::wasm::{
-    self as wit_wasm,
-    values::{InterfaceType, InterfaceValue},
-};
+use wasmer_interface_types::interpreter::wasm as wit_wasm;
+pub use wasmer_interface_types::interpreter::wasm::values::{InterfaceType, InterfaceValue};
+
+pub mod interpreter {
+    pub use wasmer_interface_types::interpreter::{Instruction, Interpreter};
+}
+
+pub mod ast {
+    pub use wasmer_interface_types::ast::*;
+}
+
+pub mod decoders {
+    pub use wasmer_interface_types::decoders::*;
+}
+
+pub mod encoders {
+    pub use wasmer_interface_types::encoders::*;
+}
 
 impl From<&core::types::Type> for InterfaceType {
     fn from(ty: &core::types::Type) -> Self {
@@ -42,7 +56,7 @@ impl From<&core::types::Value> for InterfaceValue {
 }
 
 #[allow(dead_code)]
-pub(crate) struct Export<'function> {
+pub struct Export<'function> {
     inner: core::instance::DynFunc<'function>,
     inputs: Vec<InterfaceType>,
     outputs: Vec<InterfaceType>,
@@ -112,34 +126,53 @@ impl<'a> wit_wasm::structures::Memory<core::memory::MemoryView<'a, u8>> for core
 }
 
 #[allow(unused)]
-pub(crate) struct Instance<'a> {
+pub struct Instance<'a> {
     inner: &'a core::instance::Instance,
     exports: HashMap<String, Export<'a>>,
+    memories: Vec<core::memory::Memory>,
 }
 
 impl<'a> From<&'a core::instance::Instance> for Instance<'a> {
     fn from(instance: &'a core::instance::Instance) -> Self {
+        let exports = instance
+            .module
+            .info
+            .exports
+            .iter()
+            .filter_map(|(export_name, export_index)| match export_index {
+                core::module::ExportIndex::Func(..) => Some((
+                    export_name.to_owned(),
+                    instance
+                        .dyn_func(export_name)
+                        .expect(&format!(
+                            "Failed to get a dynamic function for `{}`.",
+                            export_name
+                        ))
+                        .into(),
+                )),
+                _ => None,
+            })
+            .collect();
+
+        let mut memories: Vec<core::memory::Memory> = instance
+            .exports()
+            .filter_map(|(_, export)| match export {
+                core::export::Export::Memory(memory) => Some(memory.to_owned()),
+                _ => None,
+            })
+            .collect();
+
+        if let Some(core::export::Export::Memory(memory)) = instance
+            .import_object
+            .maybe_with_namespace("env", |env| env.get_export("memory"))
+        {
+            memories.push(memory);
+        }
+
         Self {
             inner: instance,
-            exports: instance
-                .module
-                .info
-                .exports
-                .iter()
-                .filter_map(|(export_name, export_index)| match export_index {
-                    core::module::ExportIndex::Func(..) => Some((
-                        export_name.to_owned(),
-                        instance
-                            .dyn_func(export_name)
-                            .expect(&format!(
-                                "Failed to get a dynamic function for `{}`.",
-                                export_name
-                            ))
-                            .into(),
-                    )),
-                    _ => None,
-                })
-                .collect(),
+            exports,
+            memories,
         }
     }
 }
@@ -173,7 +206,11 @@ impl<'instance>
         None
     }
 
-    fn memory(&self, _index: usize) -> Option<&core::memory::Memory> {
-        None
+    fn memory(&self, index: usize) -> Option<&core::memory::Memory> {
+        if index >= self.memories.len() {
+            None
+        } else {
+            Some(&self.memories[index])
+        }
     }
 }
