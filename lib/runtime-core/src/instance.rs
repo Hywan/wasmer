@@ -50,8 +50,7 @@ impl Drop for InstanceInner {
 pub struct Instance {
     pub module: Arc<ModuleInner>,
     inner: Pin<Box<InstanceInner>>,
-    #[allow(dead_code)]
-    import_object: ImportObject,
+    pub(crate) import_object: ImportObject,
 }
 
 impl Instance {
