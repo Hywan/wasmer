@@ -17,27 +17,41 @@ impl From<&core::types::Type> for InterfaceType {
     }
 }
 
+impl From<&InterfaceValue> for core::types::Value {
+    fn from(value: &InterfaceValue) -> Self {
+        match value {
+            InterfaceValue::I32(v) => Self::I32(*v),
+            InterfaceValue::I64(v) => Self::I64(*v),
+            InterfaceValue::F32(v) => Self::F32(*v),
+            InterfaceValue::F64(v) => Self::F64(*v),
+            _ => unimplemented!(),
+        }
+    }
+}
+
+impl From<&core::types::Value> for InterfaceValue {
+    fn from(value: &core::types::Value) -> Self {
+        match value {
+            core::types::Value::I32(v) => Self::I32(*v),
+            core::types::Value::I64(v) => Self::I64(*v),
+            core::types::Value::F32(v) => Self::F32(*v),
+            core::types::Value::F64(v) => Self::F64(*v),
+            _ => unimplemented!(),
+        }
+    }
+}
+
 #[allow(dead_code)]
-pub(crate) struct Export {
-    inner: core::export::Export,
+pub(crate) struct Export<'function> {
+    inner: core::instance::DynFunc<'function>,
     inputs: Vec<InterfaceType>,
     outputs: Vec<InterfaceType>,
 }
 
-impl From<core::export::Export> for Export {
-    fn from(export: core::export::Export) -> Self {
-        let inputs = match &export {
-            core::export::Export::Function { signature, .. } => {
-                signature.params().iter().map(Into::into).collect()
-            }
-            _ => vec![],
-        };
-        let outputs = match &export {
-            core::export::Export::Function { signature, .. } => {
-                signature.returns().iter().map(Into::into).collect()
-            }
-            _ => vec![],
-        };
+impl<'function> From<core::instance::DynFunc<'function>> for Export<'function> {
+    fn from(export: core::instance::DynFunc<'function>) -> Self {
+        let inputs = export.signature.params().iter().map(Into::into).collect();
+        let outputs = export.signature.returns().iter().map(Into::into).collect();
 
         Self {
             inner: export,
@@ -47,15 +61,15 @@ impl From<core::export::Export> for Export {
     }
 }
 
-impl Deref for Export {
-    type Target = core::export::Export;
+impl<'function> Deref for Export<'function> {
+    type Target = core::instance::DynFunc<'function>;
 
-    fn deref(&self) -> &core::export::Export {
+    fn deref(&self) -> &Self::Target {
         &self.inner
     }
 }
 
-impl wit_wasm::structures::Export for Export {
+impl<'function> wit_wasm::structures::Export for Export<'function> {
     fn inputs_cardinality(&self) -> usize {
         self.inputs.len()
     }
@@ -72,8 +86,16 @@ impl wit_wasm::structures::Export for Export {
         &self.outputs
     }
 
-    fn call(&self, _arguments: &[InterfaceValue]) -> Result<Vec<InterfaceValue>, ()> {
-        Err(())
+    fn call(&self, arguments: &[InterfaceValue]) -> Result<Vec<InterfaceValue>, ()> {
+        self.inner
+            .call(
+                &arguments
+                    .iter()
+                    .map(Into::into)
+                    .collect::<Vec<core::types::Value>>(),
+            )
+            .map(|results| results.iter().map(Into::into).collect())
+            .map_err(|_| ())
     }
 }
 
@@ -92,7 +114,7 @@ impl<'a> wit_wasm::structures::Memory<core::memory::MemoryView<'a, u8>> for core
 #[allow(unused)]
 pub(crate) struct Instance<'a> {
     inner: &'a core::instance::Instance,
-    exports: HashMap<String, Export>,
+    exports: HashMap<String, Export<'a>>,
 }
 
 impl<'a> From<&'a core::instance::Instance> for Instance<'a> {
@@ -100,11 +122,21 @@ impl<'a> From<&'a core::instance::Instance> for Instance<'a> {
         Self {
             inner: instance,
             exports: instance
-                .exports()
-                .filter_map(|(export_name, export)| match export {
-                    core::export::Export::Function { .. } => {
-                        Some((export_name, export.clone().into()))
-                    }
+                .module
+                .info
+                .exports
+                .iter()
+                .filter_map(|(export_name, export_index)| match export_index {
+                    core::module::ExportIndex::Func(..) => Some((
+                        export_name.to_owned(),
+                        instance
+                            .dyn_func(export_name)
+                            .expect(&format!(
+                                "Failed to get a dynamic function for `{}`.",
+                                export_name
+                            ))
+                            .into(),
+                    )),
                     _ => None,
                 })
                 .collect(),
@@ -115,20 +147,20 @@ impl<'a> From<&'a core::instance::Instance> for Instance<'a> {
 impl Deref for Instance<'_> {
     type Target = core::instance::Instance;
 
-    fn deref(&self) -> &core::instance::Instance {
+    fn deref(&self) -> &Self::Target {
         self.inner
     }
 }
 
 impl<'instance>
     wit_wasm::structures::Instance<
-        Export,
+        Export<'instance>,
         (),
         core::memory::Memory,
         core::memory::MemoryView<'_, u8>,
     > for Instance<'instance>
 {
-    fn export(&self, export_name: &str) -> Option<&Export> {
+    fn export(&self, export_name: &str) -> Option<&Export<'instance>> {
         self.exports.get(export_name)
     }
 
