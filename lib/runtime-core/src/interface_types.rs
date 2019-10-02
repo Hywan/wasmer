@@ -1,5 +1,5 @@
-use crate as core;
-use std::{collections::HashMap, mem, ops::Deref};
+use crate::{self as core, structures::TypedIndex};
+use std::{collections::HashMap, mem, ops::Deref, sync::Arc};
 use wasmer_interface_types::interpreter::wasm as wit_wasm;
 pub use wasmer_interface_types::interpreter::wasm::values::{InterfaceType, InterfaceValue};
 
@@ -55,7 +55,6 @@ impl From<&core::types::Value> for InterfaceValue {
     }
 }
 
-#[allow(dead_code)]
 pub struct Export<'function> {
     inner: core::instance::DynFunc<'function>,
     inputs: Vec<InterfaceType>,
@@ -113,6 +112,61 @@ impl<'function> wit_wasm::structures::Export for Export<'function> {
     }
 }
 
+pub struct LocalImport {
+    #[allow(unused)]
+    function_index: core::types::FuncIndex,
+    #[allow(unused)]
+    module: Arc<core::module::ModuleInner>,
+    inputs: Vec<InterfaceType>,
+    outputs: Vec<InterfaceType>,
+}
+
+impl LocalImport {
+    fn new(
+        function_index: core::types::FuncIndex,
+        module: Arc<core::module::ModuleInner>,
+    ) -> Result<Self, &'static str> {
+        let signature_index = module
+            .info
+            .func_assoc
+            .get(function_index)
+            .ok_or_else(|| "Invalid function index.")?;
+        let signature = core::sig_registry::SigRegistry
+            .lookup_signature_ref(&module.info.signatures[*signature_index]);
+        let inputs = signature.params().iter().map(Into::into).collect();
+        let outputs = signature.returns().iter().map(Into::into).collect();
+
+        Ok(Self {
+            function_index,
+            module,
+            inputs,
+            outputs,
+        })
+    }
+}
+
+impl wit_wasm::structures::LocalImport for LocalImport {
+    fn inputs_cardinality(&self) -> usize {
+        self.inputs.len()
+    }
+
+    fn outputs_cardinality(&self) -> usize {
+        self.outputs.len()
+    }
+
+    fn inputs(&self) -> &[InterfaceType] {
+        &self.inputs
+    }
+
+    fn outputs(&self) -> &[InterfaceType] {
+        &self.outputs
+    }
+
+    fn call(&self, _arguments: &[InterfaceValue]) -> Result<Vec<InterfaceValue>, ()> {
+        Err(())
+    }
+}
+
 impl wit_wasm::structures::MemoryView for core::memory::MemoryView<'_, u8> {}
 
 impl<'a> wit_wasm::structures::Memory<core::memory::MemoryView<'a, u8>> for core::memory::Memory {
@@ -125,10 +179,10 @@ impl<'a> wit_wasm::structures::Memory<core::memory::MemoryView<'a, u8>> for core
     }
 }
 
-#[allow(unused)]
 pub struct Instance<'a> {
     inner: &'a core::instance::Instance,
     exports: HashMap<String, Export<'a>>,
+    locals_imports: HashMap<usize, LocalImport>,
     memories: Vec<core::memory::Memory>,
 }
 
@@ -173,6 +227,7 @@ impl<'a> From<&'a core::instance::Instance> for Instance<'a> {
             inner: instance,
             exports,
             memories,
+            locals_imports: HashMap::new(),
         }
     }
 }
@@ -188,7 +243,7 @@ impl Deref for Instance<'_> {
 impl<'instance>
     wit_wasm::structures::Instance<
         Export<'instance>,
-        (),
+        LocalImport,
         core::memory::Memory,
         core::memory::MemoryView<'_, u8>,
     > for Instance<'instance>
@@ -201,9 +256,18 @@ impl<'instance>
         I: wit_wasm::structures::TypedIndex + wit_wasm::structures::LocalImportIndex,
     >(
         &self,
-        _index: I,
-    ) -> Option<&()> {
-        None
+        index: I,
+    ) -> Option<&LocalImport> {
+        let index = index.index();
+
+        if !self.locals_imports.contains_key(&index) {
+            let function_index = core::types::FuncIndex::new(index);
+            let local_import = LocalImport::new(function_index, self.module.clone()).ok()?;
+
+            self.locals_imports.insert(index, local_import);
+        }
+
+        self.locals_imports.get(&index)
     }
 
     fn memory(&self, index: usize) -> Option<&core::memory::Memory> {

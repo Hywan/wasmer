@@ -50,6 +50,7 @@ impl Drop for InstanceInner {
 pub struct Instance {
     pub module: Arc<ModuleInner>,
     inner: Pin<Box<InstanceInner>>,
+    #[allow(dead_code)]
     pub(crate) import_object: ImportObject,
 }
 
@@ -546,7 +547,7 @@ impl LikeNamespace for Arc<Mutex<Instance>> {
 }
 
 #[must_use]
-fn call_func_with_index(
+pub(crate) fn call_func_with_index(
     info: &ModuleInfo,
     runnable: &dyn RunnableModule,
     import_backing: &ImportBacking,
