@@ -183,7 +183,7 @@ mod tests {
         let instance = module
             .instantiate(&imports)
             .expect("Failed to instantiate the module.");
-        let instance: wit::Instance = (&instance).into();
+        let mut instance: wit::Instance = (&instance).into();
 
         let custom_section_bytes = module
             .info()
@@ -219,7 +219,7 @@ mod tests {
 
         let invocation_inputs = vec![InterfaceValue::I32(7), InterfaceValue::I32(42)];
 
-        let run = interpreter.run(&invocation_inputs, &instance);
+        let run = interpreter.run(&invocation_inputs, &mut instance);
 
         //assert!(run.is_ok());
 
