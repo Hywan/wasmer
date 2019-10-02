@@ -1,0 +1,12 @@
+[package]
+name = "wasmer-runtime-core-tests"
+version = "0.7.0"
+description = "Tests for the Wasmer runtime core crate"
+license = "MIT"
+authors = ["The Wasmer Engineering Team <engineering@wasmer.io>"]
+edition = "2018"
+publish = false
+
+[dependencies]
+wasmer-runtime-core = { path = "../runtime-core", version = "0.7.0", features = [ "backend-cranelift", "interface-types" ] }
+wasmer-clif-backend = { path = "../clif-backend", version = "0.7.0" }

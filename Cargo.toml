@@ -57,6 +57,7 @@ members = [
     "lib/emscripten-tests",
     "lib/middleware-common-tests",
     "lib/interface-types",
+    "lib/runtime-core-tests",
     "examples/plugin-for-example",
 ]
 
