@@ -255,7 +255,7 @@ impl<'instance>
     fn local_or_import<
         I: wit_wasm::structures::TypedIndex + wit_wasm::structures::LocalImportIndex,
     >(
-        &self,
+        &mut self,
         index: I,
     ) -> Option<&LocalImport> {
         let index = index.index();
