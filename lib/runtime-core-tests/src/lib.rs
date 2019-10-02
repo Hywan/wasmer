@@ -3,11 +3,16 @@ mod tests {
     use std::{convert::TryInto, fs};
     use wasmer_clif_backend::CraneliftCompiler;
     use wasmer_runtime_core::{
-        self as core,
+        self as core, func, imports,
         interface_types::{
             self as wit, ast, decoders,
             interpreter::{Instruction, Interpreter},
+            InterfaceValue,
         },
+        memory,
+        types::MemoryDescriptor,
+        units::Pages,
+        vm::Ctx,
     };
 
     fn get_module() -> core::Module {
@@ -154,5 +159,79 @@ mod tests {
 
             Err(_) => assert!(false),
         }
+    }
+
+    #[test]
+    fn test_interpreter() {
+        let module = get_module();
+
+        let memory = memory::Memory::new(
+            MemoryDescriptor::new(Pages(256), Some(Pages(256)), false).unwrap(),
+        )
+        .expect("Failed to create a memory.");
+
+        let imports = imports! {
+            "host" => {
+                "console_log" => func!(console_log),
+                "document_title" => func!(document_title),
+            },
+            "env" => {
+                "memory" => memory,
+            },
+        };
+
+        let instance = module
+            .instantiate(&imports)
+            .expect("Failed to instantiate the module.");
+        let instance: wit::Instance = (&instance).into();
+
+        let custom_section_bytes = module
+            .info()
+            .custom_sections
+            .get("interface-types")
+            .expect("Failed to find the custom section `interface-types`.")
+            .as_slice();
+
+        let (_, interfaces) = decoders::binary::parse::<()>(custom_section_bytes)
+            .expect("Failed to parse the `interface-types` custom section.");
+
+        let instructions = interfaces
+            .adapters
+            .iter()
+            .find_map(|adapter| match adapter {
+                ast::Adapter::Import {
+                    namespace: "host",
+                    name: "console_log",
+                    instructions,
+                    ..
+                } => Some(instructions),
+                _ => None,
+            })
+            .expect("Failed to find the instructions of the `host.console_log` import adapter.");
+
+        let interpreter: Interpreter<
+            wit::Instance,
+            wit::Export,
+            wit::LocalImport,
+            core::memory::Memory,
+            core::memory::MemoryView<'_, u8>,
+        > = instructions.try_into().unwrap();
+
+        let invocation_inputs = vec![InterfaceValue::I32(7), InterfaceValue::I32(42)];
+
+        let run = interpreter.run(&invocation_inputs, &instance);
+
+        //assert!(run.is_ok());
+
+        assert_eq!("foo", run.unwrap_err());
+    }
+
+    fn console_log(_: &mut Ctx, pointer: i32) {
+        println!("in console_log");
+    }
+
+    fn document_title(_: &mut Ctx) -> i32 {
+        println!("in document_title");
+        0
     }
 }
