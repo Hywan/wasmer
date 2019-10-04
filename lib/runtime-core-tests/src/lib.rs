@@ -183,7 +183,6 @@ mod tests {
         let instance = module
             .instantiate(&imports)
             .expect("Failed to instantiate the module.");
-        let mut instance: wit::Instance = (&instance).into();
 
         let custom_section_bytes = module
             .info()
@@ -194,6 +193,9 @@ mod tests {
 
         let (_, interfaces) = decoders::binary::parse::<()>(custom_section_bytes)
             .expect("Failed to parse the `interface-types` custom section.");
+
+        let mut instance =
+            wit::Instance::new(&instance, &interfaces).expect("Failed to create the instance.");
 
         let instructions = interfaces
             .adapters
@@ -226,7 +228,7 @@ mod tests {
         assert_eq!("foo", run.unwrap_err());
     }
 
-    fn console_log(_: &mut Ctx, pointer: i32) {
+    fn console_log(_: &mut Ctx, message: i32) {
         println!("in console_log");
     }
 
