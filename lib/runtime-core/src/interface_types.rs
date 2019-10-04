@@ -55,26 +55,26 @@ impl From<&core::types::Value> for InterfaceValue {
     }
 }
 
-pub struct Export<'function> {
+pub struct Export<'function, 'interfaces> {
     inner: core::instance::DynFunc<'function>,
-    inputs: Vec<InterfaceType>,
-    outputs: Vec<InterfaceType>,
+    inputs: &'interfaces [InterfaceType],
+    outputs: &'interfaces [InterfaceType],
 }
 
-impl<'function, 'interfaces> Export<'function> {
+impl<'function, 'interfaces> Export<'function, 'interfaces> {
     fn new(
         export_callable: core::instance::DynFunc<'function>,
         wit_export: &'interfaces wit::ast::Export<'interfaces>,
     ) -> Self {
         Self {
             inner: export_callable,
-            inputs: wit_export.input_types.clone(),
-            outputs: wit_export.output_types.clone(),
+            inputs: &wit_export.input_types,
+            outputs: &wit_export.output_types,
         }
     }
 }
 
-impl<'function> Deref for Export<'function> {
+impl<'function> Deref for Export<'function, '_> {
     type Target = core::instance::DynFunc<'function>;
 
     fn deref(&self) -> &Self::Target {
@@ -82,7 +82,7 @@ impl<'function> Deref for Export<'function> {
     }
 }
 
-impl<'function> wit_wasm::structures::Export for Export<'function> {
+impl<'function, 'interfaces> wit_wasm::structures::Export for Export<'function, 'interfaces> {
     fn inputs_cardinality(&self) -> usize {
         self.inputs.len()
     }
@@ -92,11 +92,11 @@ impl<'function> wit_wasm::structures::Export for Export<'function> {
     }
 
     fn inputs(&self) -> &[InterfaceType] {
-        &self.inputs
+        self.inputs
     }
 
     fn outputs(&self) -> &[InterfaceType] {
-        &self.outputs
+        self.outputs
     }
 
     fn call(&self, arguments: &[InterfaceValue]) -> Result<Vec<InterfaceValue>, ()> {
@@ -192,7 +192,7 @@ impl<'a> wit_wasm::structures::Memory<core::memory::MemoryView<'a, u8>> for core
 
 pub struct Instance<'instance, 'interfaces> {
     inner: &'instance core::instance::Instance,
-    exports: HashMap<String, Export<'instance>>,
+    exports: HashMap<String, Export<'instance, 'interfaces>>,
     locals_imports: HashMap<usize, LocalImport>,
     memories: Vec<core::memory::Memory>,
     #[allow(unused)]
@@ -291,13 +291,13 @@ impl Deref for Instance<'_, '_> {
 
 impl<'instance, 'interfaces>
     wit_wasm::structures::Instance<
-        Export<'instance>,
+        Export<'instance, 'interfaces>,
         LocalImport,
         core::memory::Memory,
         core::memory::MemoryView<'_, u8>,
     > for Instance<'instance, 'interfaces>
 {
-    fn export(&self, export_name: &str) -> Option<&Export<'instance>> {
+    fn export(&self, export_name: &str) -> Option<&Export<'instance, 'interfaces>> {
         self.exports.get(export_name)
     }
 
