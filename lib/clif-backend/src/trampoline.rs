@@ -250,20 +250,24 @@ fn generate_export_signature(func_sig: &FuncSig) -> ir::Signature {
         location: ir::ArgumentLoc::Unassigned,
     });
 
-    export_clif_sig.params = iter::once(ir::AbiParam {
-        value_type: ir::types::I64,
-        purpose: ir::ArgumentPurpose::VMContext,
-        extension: ir::ArgumentExtension::None,
-        location: ir::ArgumentLoc::Unassigned,
-    })
-    .chain(iter::once(ir::AbiParam {
-        value_type: ir::types::I64,
-        purpose: ir::ArgumentPurpose::Normal,
-        extension: ir::ArgumentExtension::None,
-        location: ir::ArgumentLoc::Unassigned,
-    }))
-    .chain(func_sig_iter)
-    .collect();
+    export_clif_sig.params =
+        // vmctx
+        iter::once(ir::AbiParam {
+            value_type: ir::types::I64,
+            purpose: ir::ArgumentPurpose::VMContext,
+            extension: ir::ArgumentExtension::None,
+            location: ir::ArgumentLoc::Unassigned,
+        })
+        // func_env
+        .chain(iter::once(ir::AbiParam {
+            value_type: ir::types::I64,
+            purpose: ir::ArgumentPurpose::Normal,
+            extension: ir::ArgumentExtension::None,
+            location: ir::ArgumentLoc::Unassigned,
+        }))
+        // args
+        .chain(func_sig_iter)
+        .collect();
 
     export_clif_sig.returns = func_sig
         .returns()

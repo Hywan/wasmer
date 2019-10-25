@@ -6,21 +6,26 @@ use crate::{
     resolver::FuncResolverBuilder, signal::Caller, trampoline::Trampolines,
 };
 
-use cranelift_codegen::entity::EntityRef;
-use cranelift_codegen::ir::{self, Ebb, Function, InstBuilder};
-use cranelift_codegen::isa::CallConv;
-use cranelift_codegen::{cursor::FuncCursor, isa};
+use cranelift_codegen::{
+    entity::EntityRef,
+    ir::{self, Ebb, Function, InstBuilder},
+    isa::CallConv,
+    {cursor::FuncCursor, isa},
+};
 use cranelift_frontend::{FunctionBuilder, Position, Variable};
-use cranelift_wasm::{self, FuncTranslator};
-use cranelift_wasm::{get_vmctx_value_label, translate_operator};
-use cranelift_wasm::{FuncEnvironment, ReturnMode, WasmError};
-use std::mem;
-use std::sync::{Arc, RwLock};
-use wasmer_runtime_core::error::CompileError;
+use cranelift_wasm::{
+    {self, FuncTranslator}, {get_vmctx_value_label, translate_operator},
+    {FuncEnvironment, ReturnMode, WasmError},
+};
+use std::{
+    mem,
+    sync::{Arc, RwLock},
+};
 use wasmer_runtime_core::{
     backend::{Backend, CacheGen, Token},
     cache::{Artifact, Error as CacheError},
     codegen::*,
+    error::CompileError,
     memory::MemoryType,
     module::{ModuleInfo, ModuleInner},
     structures::{Map, TypedIndex},
@@ -66,8 +71,6 @@ impl ModuleCodeGenerator<CraneliftFunctionCodeGenerator, Caller, CodegenError>
         &mut self,
         module_info: Arc<RwLock<ModuleInfo>>,
     ) -> Result<&mut CraneliftFunctionCodeGenerator, CodegenError> {
-        // define_function_body(
-
         let func_translator = FuncTranslator::new();
 
         let func_index = LocalFuncIndex::new(self.functions.len());
@@ -82,8 +85,6 @@ impl ModuleCodeGenerator<CraneliftFunctionCodeGenerator, Caller, CodegenError>
         );
 
         let func = ir::Function::with_name_signature(name, sig);
-
-        //func_translator.translate(body_bytes, body_offset, &mut func, &mut func_env)?;
 
         let mut func_env = CraneliftFunctionCodeGenerator {
             func,
@@ -908,13 +909,28 @@ impl FuncEnvironment for FunctionEnvironment {
                     readonly: true,
                 });
 
+                /*
+                let imported_func_env_addr =
+                    pos.func.create_global_value(ir::GlobalValueData::Load {
+                        base: imported_func_struct_addr,
+                        offset: (vm::ImportedFunc::offset_func_env() as i32).into(),
+                        global_type: ptr_type,
+                        readonly: true,
+                    });
+                */
+
                 let imported_func_addr = pos.ins().global_value(ptr_type, imported_func_addr);
                 let imported_vmctx_addr = pos.ins().global_value(ptr_type, imported_vmctx_addr);
+                /*
+                let imported_func_env_addr =
+                    pos.ins().global_value(ptr_type, imported_func_env_addr);
+                */
 
                 let sig_ref = pos.func.dfg.ext_funcs[callee].signature;
 
                 let mut args = Vec::with_capacity(call_args.len() + 1);
                 args.push(imported_vmctx_addr);
+                //args.push(imported_func_env_addr);
                 args.extend(call_args.iter().cloned());
 
                 Ok(pos
@@ -1064,7 +1080,8 @@ impl FunctionEnvironment {
         Converter(sig_index).into()
     }
 
-    /// Creates a signature with VMContext as the first param
+    /// Creates a signature with `vmctx` and `func_env` resp. as the
+    /// first and second parameter.
     pub fn generate_signature(
         &self,
         clif_sig_index: cranelift_wasm::SignatureIndex,
@@ -1072,11 +1089,28 @@ impl FunctionEnvironment {
         // Get signature
         let mut signature = self.clif_signatures[Converter(clif_sig_index).into()].clone();
 
-        // Add the vmctx parameter type to it
+        // Add the vmctx parameter type
         signature.params.insert(
             0,
-            ir::AbiParam::special(self.pointer_type(), ir::ArgumentPurpose::VMContext),
+            ir::AbiParam {
+                value_type: self.pointer_type(),
+                purpose: ir::ArgumentPurpose::VMContext,
+                extension: ir::ArgumentExtension::None,
+                location: ir::ArgumentLoc::Unassigned,
+            },
         );
+        /*
+        // Add the func_env parameter type
+        signature.params.insert(
+            1,
+            ir::AbiParam {
+                value_type: self.pointer_type(),
+                purpose: ir::ArgumentPurpose::Normal,
+                extension: ir::ArgumentExtension::None,
+                location: ir::ArgumentLoc::Unassigned,
+            },
+        );
+        */
 
         // Return signature
         signature
@@ -1207,7 +1241,8 @@ impl CraneliftFunctionCodeGenerator {
     }
 }
 
-/// Creates a signature with VMContext as the last param
+/// Creates a signature with `vmctx` and `func_env` resp. as the first
+/// and second parameter.
 fn generate_signature(
     env: &CraneliftModuleCodeGenerator,
     clif_sig_index: cranelift_wasm::SignatureIndex,
@@ -1215,11 +1250,28 @@ fn generate_signature(
     // Get signature
     let mut signature = env.clif_signatures[Converter(clif_sig_index).into()].clone();
 
-    // Add the vmctx parameter type to it
+    // Add the vmctx parameter type
     signature.params.insert(
         0,
-        ir::AbiParam::special(pointer_type(env), ir::ArgumentPurpose::VMContext),
+        ir::AbiParam {
+            value_type: pointer_type(env),
+            purpose: ir::ArgumentPurpose::VMContext,
+            extension: ir::ArgumentExtension::None,
+            location: ir::ArgumentLoc::Unassigned,
+        },
     );
+    /*
+    // Add the func_env parameter type
+    signature.params.insert(
+        1,
+        ir::AbiParam {
+            value_type: pointer_type(env),
+            purpose: ir::ArgumentPurpose::Normal,
+            extension: ir::ArgumentExtension::None,
+            location: ir::ArgumentLoc::Unassigned,
+        },
+    );
+    */
 
     // Return signature
     signature

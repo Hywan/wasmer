@@ -513,6 +513,10 @@ macro_rules! impl_traits {
                     Trap: TrapEarly<Rets>,
                     FN: Fn( &mut vm::Ctx $( , $x )* ) -> Trap + 'static,
                 {
+                    dbg!(&vmctx);
+                    dbg!(&func_env);
+                    $(dbg!($x.to_binary());)*
+
                     let func: &FN =
                         // `FN` is a function pointer, or a closure
                         // _without_ a captured environment.
@@ -588,7 +592,7 @@ where
     fn to_export(&self) -> Export {
         let func = unsafe { FuncPointer::new(self.func.as_ptr()) };
         let ctx = if let Some(ptr) = self.func_env {
-            Context::External(ptr.cast().as_ptr())
+            Context::External(ptr.as_ptr())
         } else {
             Context::Internal
         };

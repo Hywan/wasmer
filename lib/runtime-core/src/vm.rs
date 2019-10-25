@@ -11,14 +11,15 @@ use crate::{
 };
 use std::{
     cell::UnsafeCell,
+    collections::HashMap,
     ffi::c_void,
     mem,
     ptr::{self, NonNull},
-    sync::atomic::{AtomicUsize, Ordering},
-    sync::Once,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Once,
+    },
 };
-
-use std::collections::HashMap;
 
 /// The context of the currently running WebAssembly instance.
 ///

@@ -71,6 +71,8 @@ impl RunnableModule for Caller {
         ) -> bool {
             let handler_data = &*invoke_env.unwrap().cast().as_ptr();
 
+            dbg!(vmctx, func_env);
+
             #[cfg(not(target_os = "windows"))]
             let res = call_protected(handler_data, || {
                 // Leap of faith.

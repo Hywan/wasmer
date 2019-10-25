@@ -585,7 +585,7 @@ fn import_functions(
                         func: func.inner(),
                         func_env: match ctx {
                             Context::External(func_env) => func_env,
-                            Context::Internal => vmctx as *mut vm::FuncEnv,
+                            Context::Internal => ptr::null_mut(),
                         },
                         vmctx,
                     });
