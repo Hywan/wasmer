@@ -6,12 +6,13 @@ use crate::{
     types::{FuncSig, TableDescriptor},
     vm,
 };
-use std::sync::Arc;
+use std::{ptr, sync::Arc};
 
 enum AnyfuncInner<'a> {
     Host {
-        ptr: *const vm::Func,
-        env: *mut vm::FuncEnv,
+        func: *const vm::Func,
+        func_env: *mut vm::FuncEnv,
+        vmctx: *mut vm::Ctx,
         signature: Arc<FuncSig>,
     },
     Managed(DynFunc<'a>),
@@ -22,14 +23,20 @@ pub struct Anyfunc<'a> {
 }
 
 impl<'a> Anyfunc<'a> {
-    pub unsafe fn new<Sig>(func: *const vm::Func, env: *mut vm::FuncEnv, signature: Sig) -> Self
+    pub unsafe fn new<Sig>(
+        func: *const vm::Func,
+        func_env: *mut vm::FuncEnv,
+        vmctx: *mut vm::Ctx,
+        signature: Sig,
+    ) -> Self
     where
         Sig: Into<Arc<FuncSig>>,
     {
         Self {
             inner: AnyfuncInner::Host {
-                ptr: func as _,
-                env,
+                func,
+                func_env,
+                vmctx,
                 signature: signature.into(),
             },
         }
@@ -101,16 +108,18 @@ impl AnyfuncTable {
         if let Some(slot) = self.backing.get_mut(index as usize) {
             let anyfunc = match element.inner {
                 AnyfuncInner::Host {
-                    ptr,
-                    env,
+                    func,
+                    func_env,
+                    vmctx,
                     signature,
                 } => {
                     let sig_index = SigRegistry.lookup_sig_index(signature);
                     let sig_id = vm::SigId(sig_index.index() as u32);
 
                     vm::Anyfunc {
-                        func: ptr,
-                        func_env: env,
+                        func,
+                        func_env,
+                        vmctx,
                         sig_id,
                     }
                 }
@@ -120,7 +129,8 @@ impl AnyfuncTable {
 
                     vm::Anyfunc {
                         func: func.raw(),
-                        func_env: func.instance_inner.vmctx as _, // cast `*mut vm::Ctx` to `*mut vm::FuncEnv`
+                        func_env: ptr::null_mut(),
+                        vmctx: func.instance_inner.vmctx,
                         sig_id,
                     }
                 }

@@ -3,10 +3,11 @@
 
 #include <stdint.h>
 
-typedef struct func_t func_t;
+typedef struct vmctx_t vmctx_t;
 typedef struct funcenv_t funcenv_t;
+typedef struct func_t func_t;
 
-typedef void(*trampoline_t)(const funcenv_t*,  const func_t*, const uint64_t*, uint64_t*);
+typedef void(*trampoline_t)(const vmctx_t*, const funcenv_t*,  const func_t*, const uint64_t*, uint64_t*);
 
 typedef struct call_protected_result_t {
     uint64_t code;
@@ -16,6 +17,7 @@ typedef struct call_protected_result_t {
 
 uint8_t callProtected(
     trampoline_t trampoline,
+    const vmctx_t* vmctx,
     const funcenv_t* func_env,
     const func_t* func,
     const uint64_t* param_vec,

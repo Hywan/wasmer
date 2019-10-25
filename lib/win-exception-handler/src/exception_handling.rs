@@ -17,7 +17,8 @@ extern "C" {
     #[link_name = "callProtected"]
     pub fn __call_protected(
         trampoline: Trampoline,
-        env: Option<NonNull<vm::FuncEnv>>,
+        vmctx: Option<NonNull<vm::Ctx>>,
+        func_env: Option<NonNull<vm::FuncEnv>>,
         func: NonNull<vm::Func>,
         param_vec: *const u64,
         return_vec: *mut u64,
@@ -27,7 +28,8 @@ extern "C" {
 
 pub fn _call_protected(
     trampoline: Trampoline,
-    env: Option<NonNull<vm::FuncEnv>>,
+    vmctx: Option<NonNull<vm::Ctx>>,
+    func_env: Option<NonNull<vm::FuncEnv>>,
     func: NonNull<vm::Func>,
     param_vec: *const u64,
     return_vec: *mut u64,
@@ -40,7 +42,8 @@ pub fn _call_protected(
     let result = unsafe {
         __call_protected(
             trampoline,
-            env,
+            vmctx,
+            func_env,
             func,
             param_vec,
             return_vec,

@@ -381,7 +381,7 @@ impl LocalBacking {
                                     vmctx as *mut vm::FuncEnv,
                                 ),
                                 LocalOrImport::Import(imported_func_index) => {
-                                    let vm::ImportedFunc { func, func_env } =
+                                    let vm::ImportedFunc { func, func_env, .. } =
                                         imports.vm_functions[imported_func_index];
 
                                     (func, func_env)
@@ -391,6 +391,7 @@ impl LocalBacking {
                             elements[init_base + i] = vm::Anyfunc {
                                 func,
                                 func_env,
+                                vmctx,
                                 sig_id,
                             };
                         }
@@ -407,7 +408,7 @@ impl LocalBacking {
                             let sig_id =
                                 vm::SigId(SigRegistry.lookup_sig_index(signature).index() as u32);
 
-                            let (func, env) = match func_index.local_or_import(&module.info) {
+                            let (func, func_env) = match func_index.local_or_import(&module.info) {
                                 LocalOrImport::Local(local_func_index) => (
                                     module
                                         .runnable_module
@@ -418,7 +419,7 @@ impl LocalBacking {
                                     vmctx as *mut vm::FuncEnv,
                                 ),
                                 LocalOrImport::Import(imported_func_index) => {
-                                    let vm::ImportedFunc { func, func_env } =
+                                    let vm::ImportedFunc { func, func_env, .. } =
                                         imports.vm_functions[imported_func_index];
 
                                     (func, func_env)
@@ -427,7 +428,8 @@ impl LocalBacking {
 
                             elements[init_base + i] = vm::Anyfunc {
                                 func,
-                                func_env: env,
+                                func_env,
+                                vmctx,
                                 sig_id,
                             };
                         }
@@ -585,6 +587,7 @@ fn import_functions(
                             Context::External(func_env) => func_env,
                             Context::Internal => vmctx as *mut vm::FuncEnv,
                         },
+                        vmctx,
                     });
                 } else {
                     link_errors.push(LinkError::IncorrectImportSignature {
@@ -615,6 +618,7 @@ fn import_functions(
                     functions.push(vm::ImportedFunc {
                         func: ptr::null(),
                         func_env: ptr::null_mut(),
+                        vmctx: ptr::null_mut(),
                     });
                 } else {
                     link_errors.push(LinkError::ImportNotFound {

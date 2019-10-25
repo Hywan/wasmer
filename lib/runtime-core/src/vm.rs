@@ -409,6 +409,7 @@ impl Ctx {
         let Anyfunc {
             func,
             func_env,
+            vmctx,
             sig_id,
         } = anyfunc_table.backing[index.index()];
 
@@ -426,7 +427,7 @@ impl Ctx {
         };
 
         call_func_with_index_inner(
-            None,
+            NonNull::new(vmctx),
             NonNull::new(func_env),
             NonNull::new(func as *mut _).unwrap(),
             &signature,
@@ -520,6 +521,7 @@ pub struct FuncEnv {
 pub struct ImportedFunc {
     pub func: *const Func,
     pub func_env: *mut FuncEnv,
+    pub vmctx: *mut Ctx,
 }
 
 unsafe impl Send for ImportedFunc {}
@@ -532,6 +534,10 @@ impl ImportedFunc {
 
     pub fn offset_func_env() -> u8 {
         1 * (mem::size_of::<usize>() as u8)
+    }
+
+    pub fn offset_vmctx() -> u8 {
+        2 * (mem::size_of::<usize>() as u8)
     }
 
     pub fn size() -> u8 {
@@ -633,6 +639,7 @@ pub struct SigId(pub u32);
 pub struct Anyfunc {
     pub func: *const Func,
     pub func_env: *mut FuncEnv,
+    pub vmctx: *mut Ctx,
     pub sig_id: SigId,
 }
 
@@ -644,6 +651,7 @@ impl Anyfunc {
         Self {
             func: ptr::null(),
             func_env: ptr::null_mut(),
+            vmctx: ptr::null_mut(),
             sig_id: SigId(u32::max_value()),
         }
     }
@@ -657,8 +665,12 @@ impl Anyfunc {
         1 * (mem::size_of::<usize>() as u8)
     }
 
-    pub fn offset_sig_id() -> u8 {
+    pub fn offset_vmctx() -> u8 {
         2 * (mem::size_of::<usize>() as u8)
+    }
+
+    pub fn offset_sig_id() -> u8 {
+        3 * (mem::size_of::<usize>() as u8)
     }
 
     pub fn size() -> u8 {
@@ -756,6 +768,11 @@ mod vm_offset_tests {
             ImportedFunc::offset_func_env() as usize,
             offset_of!(ImportedFunc => func_env).get_byte_offset(),
         );
+
+        assert_eq!(
+            ImportedFunc::offset_vmctx() as usize,
+            offset_of!(ImportedFunc => vmctx).get_byte_offset(),
+        );
     }
 
     #[test]
@@ -802,6 +819,11 @@ mod vm_offset_tests {
         assert_eq!(
             Anyfunc::offset_func_env() as usize,
             offset_of!(Anyfunc => func_env).get_byte_offset(),
+        );
+
+        assert_eq!(
+            Anyfunc::offset_vmctx() as usize,
+            offset_of!(Anyfunc => vmctx).get_byte_offset(),
         );
 
         assert_eq!(

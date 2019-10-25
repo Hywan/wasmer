@@ -51,6 +51,7 @@ static void removeExceptionHandler() {
 
 uint8_t callProtected(
     trampoline_t trampoline,
+    const vmctx_t* vmctx,
     const funcenv_t* func_env,
     const func_t* func,
     const uint64_t* param_vec,
@@ -69,7 +70,7 @@ uint8_t callProtected(
     {
         // save the stack pointer
         savedStackPointer = get_callee_frame_address();
-        trampoline(func_env, func, param_vec, return_vec);
+        trampoline(vmctx, func_env, func, param_vec, return_vec);
         out_result->code = 0;
         out_result->exception_address = 0;
         out_result->instruction_pointer = 0;

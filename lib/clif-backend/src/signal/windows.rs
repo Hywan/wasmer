@@ -34,7 +34,8 @@ thread_local! {
 pub fn call_protected(
     handler_data: &HandlerData,
     trampoline: Trampoline,
-    env: Option<NonNull<vm::FuncEnv>>,
+    vmctx: Option<NonNull<vm::Ctx>>,
+    func_env: Option<NonNull<vm::FuncEnv>>,
     func: NonNull<vm::Func>,
     param_vec: *const u64,
     return_vec: *mut u64,
@@ -45,7 +46,7 @@ pub fn call_protected(
     //        return Err(RuntimeError::User { msg });
     //    }
 
-    let result = _call_protected(trampoline, env, func, param_vec, return_vec);
+    let result = _call_protected(trampoline, vmctx, func_env, func, param_vec, return_vec);
 
     if let Ok(_) = result {
         return Ok(());

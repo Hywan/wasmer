@@ -782,11 +782,11 @@ impl FuncEnvironment for FunctionEnvironment {
             vm::Anyfunc::offset_func() as i32,
         );
 
-        let env_ptr = pos.ins().load(
+        let vmctx_ptr = pos.ins().load(
             ptr_type,
             mflags,
             entry_addr,
-            vm::Anyfunc::offset_func_env() as i32,
+            vm::Anyfunc::offset_vmctx() as i32,
         );
 
         let found_sig = pos.ins().load(
@@ -821,9 +821,9 @@ impl FuncEnvironment for FunctionEnvironment {
         );
 
         // Build a value list for the indirect call instruction containing the call_args
-        // and the env parameter.
+        // and the vmctx parameter.
         let mut args = Vec::with_capacity(call_args.len() + 1);
-        args.push(env_ptr);
+        args.push(vmctx_ptr);
         args.extend(call_args.iter().cloned());
 
         Ok(pos.ins().call_indirect(sig_ref, func_ptr, &args))
@@ -843,13 +843,13 @@ impl FuncEnvironment for FunctionEnvironment {
         match callee_index.local_or_import(&self.module_info.read().unwrap()) {
             LocalOrImport::Local(local_function_index) => {
                 // this is an internal function
-                let env = pos
+                let vmctx = pos
                     .func
                     .special_param(ir::ArgumentPurpose::VMContext)
                     .expect("missing vmctx parameter");
 
                 let mut args = Vec::with_capacity(call_args.len() + 1);
-                args.push(env);
+                args.push(vmctx);
                 args.extend(call_args.iter().cloned());
 
                 let sig_ref = pos.func.dfg.ext_funcs[callee].signature;
@@ -859,7 +859,7 @@ impl FuncEnvironment for FunctionEnvironment {
                     let function_array_ptr = pos.ins().load(
                         ptr_type,
                         mflags,
-                        env,
+                        vmctx,
                         vm::Ctx::offset_local_functions() as i32,
                     );
 
@@ -875,10 +875,10 @@ impl FuncEnvironment for FunctionEnvironment {
             }
             LocalOrImport::Import(imported_func_index) => {
                 // this is an imported function
-                let env = pos.func.create_global_value(ir::GlobalValueData::VMContext);
+                let vmctx = pos.func.create_global_value(ir::GlobalValueData::VMContext);
 
                 let imported_funcs = pos.func.create_global_value(ir::GlobalValueData::Load {
-                    base: env,
+                    base: vmctx,
                     offset: (vm::Ctx::offset_imported_funcs() as i32).into(),
                     global_type: ptr_type,
                     readonly: true,
@@ -901,20 +901,20 @@ impl FuncEnvironment for FunctionEnvironment {
                     readonly: true,
                 });
 
-                let imported_env_addr = pos.func.create_global_value(ir::GlobalValueData::Load {
+                let imported_vmctx_addr = pos.func.create_global_value(ir::GlobalValueData::Load {
                     base: imported_func_struct_addr,
-                    offset: (vm::ImportedFunc::offset_func_env() as i32).into(),
+                    offset: (vm::ImportedFunc::offset_vmctx() as i32).into(),
                     global_type: ptr_type,
                     readonly: true,
                 });
 
                 let imported_func_addr = pos.ins().global_value(ptr_type, imported_func_addr);
-                let imported_env_addr = pos.ins().global_value(ptr_type, imported_env_addr);
+                let imported_vmctx_addr = pos.ins().global_value(ptr_type, imported_vmctx_addr);
 
                 let sig_ref = pos.func.dfg.ext_funcs[callee].signature;
 
                 let mut args = Vec::with_capacity(call_args.len() + 1);
-                args.push(imported_env_addr);
+                args.push(imported_vmctx_addr);
                 args.extend(call_args.iter().cloned());
 
                 Ok(pos

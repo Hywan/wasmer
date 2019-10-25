@@ -104,7 +104,7 @@ impl Instance {
                             .runnable_module
                             .get_func(&instance.module.info, local_func_index)
                             .unwrap(),
-                        NonNull::new(instance.inner.vmctx).map(|pointer| pointer.cast()),
+                        None,
                     ),
                     LocalOrImport::Import(imported_func_index) => {
                         let imported_func =
@@ -215,7 +215,7 @@ impl Instance {
                         .runnable_module
                         .get_func(&self.module.info, local_func_index)
                         .unwrap(),
-                    NonNull::new(self.inner.vmctx).map(|pointer| pointer.cast()),
+                    None,
                 ),
                 LocalOrImport::Import(import_func_index) => {
                     let imported_func = &self.inner.import_backing.vm_functions[import_func_index];
@@ -580,10 +580,9 @@ fn call_func_with_index(
 
     let (func_ptr, func_env_ptr): (_, Option<NonNull<vm::FuncEnv>>) =
         match func_index.local_or_import(info) {
-            LocalOrImport::Local(local_func_index) => (
-                runnable.get_func(info, local_func_index).unwrap(),
-                vmctx.map(|pointer| pointer.cast()),
-            ),
+            LocalOrImport::Local(local_func_index) => {
+                (runnable.get_func(info, local_func_index).unwrap(), None)
+            }
             LocalOrImport::Import(import_func_index) => {
                 let imported_func = &import_backing.vm_functions[import_func_index];
 

@@ -47,6 +47,7 @@ impl fmt::Display for WasmTrapInfo {
 pub trait Kind {}
 
 pub type Trampoline = unsafe extern "C" fn(
+    vmctx: Option<NonNull<vm::Ctx>>,
     func_env: Option<NonNull<vm::FuncEnv>>,
     func: NonNull<vm::Func>,
     args: *const u64,

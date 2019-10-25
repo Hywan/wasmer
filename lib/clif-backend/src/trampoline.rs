@@ -156,6 +156,7 @@ fn generate_func(func_sig: &FuncSig) -> ir::Function {
 
     let entry_ebb = func.dfg.make_ebb();
     let vmctx_ptr = func.dfg.append_ebb_param(entry_ebb, ir::types::I64);
+    let _func_env_ptr = func.dfg.append_ebb_param(entry_ebb, ir::types::I64);
     let func_ptr = func.dfg.append_ebb_param(entry_ebb, ir::types::I64);
     let args_ptr = func.dfg.append_ebb_param(entry_ebb, ir::types::I64);
     let returns_ptr = func.dfg.append_ebb_param(entry_ebb, ir::types::I64);
@@ -220,7 +221,18 @@ fn generate_trampoline_signature() -> ir::Signature {
         location: ir::ArgumentLoc::Unassigned,
     };
 
-    sig.params = vec![ptr_param, ptr_param, ptr_param, ptr_param];
+    sig.params = vec![
+        ir::AbiParam {
+            value_type: ir::types::I64,
+            purpose: ir::ArgumentPurpose::VMContext,
+            extension: ir::ArgumentExtension::None,
+            location: ir::ArgumentLoc::Unassigned,
+        }, // vmctx
+        ptr_param, // func_env
+        ptr_param, // func
+        ptr_param, // args
+        ptr_param, // rets
+    ];
 
     sig
 }
