@@ -156,7 +156,7 @@ fn generate_func(func_sig: &FuncSig) -> ir::Function {
 
     let entry_ebb = func.dfg.make_ebb();
     let vmctx_ptr = func.dfg.append_ebb_param(entry_ebb, ir::types::I64);
-    let _func_env_ptr = func.dfg.append_ebb_param(entry_ebb, ir::types::I64);
+    let func_env_ptr = func.dfg.append_ebb_param(entry_ebb, ir::types::I64);
     let func_ptr = func.dfg.append_ebb_param(entry_ebb, ir::types::I64);
     let args_ptr = func.dfg.append_ebb_param(entry_ebb, ir::types::I64);
     let returns_ptr = func.dfg.append_ebb_param(entry_ebb, ir::types::I64);
@@ -164,8 +164,9 @@ fn generate_func(func_sig: &FuncSig) -> ir::Function {
 
     let mut pos = FuncCursor::new(&mut func).at_first_insertion_point(entry_ebb);
 
-    let mut args_vec = Vec::with_capacity(func_sig.params().len() + 1);
+    let mut args_vec = Vec::with_capacity(func_sig.params().len() + 2);
     args_vec.push(vmctx_ptr);
+    args_vec.push(func_env_ptr);
 
     for (index, wasm_ty) in func_sig.params().iter().enumerate() {
         let mem_flags = ir::MemFlags::trusted();
@@ -255,6 +256,12 @@ fn generate_export_signature(func_sig: &FuncSig) -> ir::Signature {
         extension: ir::ArgumentExtension::None,
         location: ir::ArgumentLoc::Unassigned,
     })
+    .chain(iter::once(ir::AbiParam {
+        value_type: ir::types::I64,
+        purpose: ir::ArgumentPurpose::Normal,
+        extension: ir::ArgumentExtension::None,
+        location: ir::ArgumentLoc::Unassigned,
+    }))
     .chain(func_sig_iter)
     .collect();
 

@@ -150,11 +150,10 @@ fn imported_functions_forms() {
     }
 
     call_and_assert!(function_fn, Ok(2));
-    /*
     call_and_assert!(function_closure, Ok(2));
     call_and_assert!(function_fn_with_vmctx, Ok(2 + SHIFT));
     call_and_assert!(function_closure_with_vmctx, Ok(2 + SHIFT));
-    call_and_assert!(function_closure_with_env, Ok(2 + SHIFT));
+    //call_and_assert!(function_closure_with_env, Ok(2 + SHIFT));
     call_and_assert!(
         function_fn_trap,
         Err(RuntimeError::Error {
@@ -173,6 +172,7 @@ fn imported_functions_forms() {
             data: Box::new(format!("baz {}", 2 + SHIFT))
         })
     );
+    /*
     call_and_assert!(
         function_closure_trap_with_env,
         Err(RuntimeError::Error {
