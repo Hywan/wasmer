@@ -15,11 +15,7 @@ use crate::{
     },
     vm,
 };
-use std::{
-    fmt::Debug,
-    ptr::{self, NonNull},
-    slice,
-};
+use std::{fmt::Debug, ptr::NonNull, slice};
 
 pub const INTERNALS_SIZE: usize = 256;
 
@@ -561,6 +557,7 @@ fn import_functions(
 ) -> LinkResult<BoxedMap<ImportedFuncIndex, vm::ImportedFunc>> {
     let mut link_errors = vec![];
     let mut functions = Map::with_capacity(module.info.imported_functions.len());
+
     for (
         index,
         ImportName {
@@ -636,10 +633,13 @@ fn import_functions(
             }
             None => {
                 if imports.allow_missing_functions {
-                    functions.push(vm::ImportedFunc {
-                        func: ptr::null(),
-                        func_ctx: unsafe { NonNull::new_unchecked(ptr::null_mut()) }, // TODO: Non-sense…
-                    });
+                    panic!("ho man!");
+                /*
+                functions.push(vm::ImportedFunc {
+                    func: ptr::null(),
+                    func_ctx: unsafe { NonNull::new_unchecked(ptr::null_mut()) }, // TODO: Non-sense…
+                });
+                */
                 } else {
                     link_errors.push(LinkError::ImportNotFound {
                         namespace: namespace.to_string(),
