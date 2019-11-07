@@ -498,19 +498,23 @@ impl Ctx {
     }
 }
 
-enum InnerFunc {}
 /// Used to provide type safety (ish) for passing around function pointers.
 /// The typesystem ensures this cannot be dereferenced since an
 /// empty enum cannot actually exist.
+#[repr(transparent)]
+pub struct Func(*mut c_void);
+
 #[repr(C)]
-pub struct Func(InnerFunc);
+pub struct FuncCtx {
+    pub vmctx: *mut Ctx,
+}
 
 /// An imported function, which contains the vmctx that owns this function.
 #[derive(Debug, Clone)]
 #[repr(C)]
 pub struct ImportedFunc {
     pub func: *const Func,
-    pub vmctx: *mut Ctx,
+    pub func_ctx: *mut FuncCtx,
 }
 
 // manually implemented because ImportedFunc contains raw pointers directly; `Func` is marked Send (But `Ctx` actually isn't! (TODO: review this, shouldn't `Ctx` be Send?))

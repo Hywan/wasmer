@@ -382,9 +382,9 @@ impl LocalBacking {
                                     vmctx,
                                 ),
                                 LocalOrImport::Import(imported_func_index) => {
-                                    let vm::ImportedFunc { func, vmctx } =
+                                    let vm::ImportedFunc { func, func_ctx } =
                                         imports.vm_functions[imported_func_index];
-                                    (func, vmctx)
+                                    (func, unsafe { (*func_ctx).vmctx })
                                 }
                             };
 
@@ -415,9 +415,9 @@ impl LocalBacking {
                                     vmctx,
                                 ),
                                 LocalOrImport::Import(imported_func_index) => {
-                                    let vm::ImportedFunc { func, vmctx } =
+                                    let vm::ImportedFunc { func, func_ctx } =
                                         imports.vm_functions[imported_func_index];
-                                    (func, vmctx)
+                                    (func, unsafe { (*func_ctx).vmctx })
                                 }
                             };
 
@@ -573,10 +573,12 @@ fn import_functions(
                 if *expected_sig == *signature {
                     functions.push(vm::ImportedFunc {
                         func: func.inner(),
-                        vmctx: match ctx {
-                            Context::External(ctx) => ctx,
-                            Context::Internal => vmctx,
-                        },
+                        func_ctx: Box::into_raw(Box::new(vm::FuncCtx {
+                            vmctx: match ctx {
+                                Context::External(ctx) => ctx,
+                                Context::Internal => vmctx,
+                            },
+                        })),
                     });
                 } else {
                     link_errors.push(LinkError::IncorrectImportSignature {
@@ -606,7 +608,7 @@ fn import_functions(
                 if imports.allow_missing_functions {
                     functions.push(vm::ImportedFunc {
                         func: ::std::ptr::null(),
-                        vmctx: ::std::ptr::null_mut(),
+                        func_ctx: ::std::ptr::null_mut(),
                     });
                 } else {
                     link_errors.push(LinkError::ImportNotFound {
