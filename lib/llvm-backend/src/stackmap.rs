@@ -162,6 +162,7 @@ impl StackmapEntry {
                     Ctx::offset_imported_funcs() as usize,
                     vm::ImportedFunc::size() as usize * idx
                         + vm::ImportedFunc::offset_func_ctx() as usize,
+                    vm::FuncCtx::offset_vmctx() as usize,
                     0,
                 ]),
                 ValueSemantic::DynamicSigindice(idx) => {

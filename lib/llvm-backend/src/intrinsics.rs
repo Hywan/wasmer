@@ -210,8 +210,13 @@ impl Intrinsics {
             context.struct_type(&[i8_ptr_ty_basic, i64_ty_basic, i8_ptr_ty_basic], false);
         let local_table_ty = local_memory_ty;
         let local_global_ty = i64_ty;
-        let imported_func_ty =
-            context.struct_type(&[i8_ptr_ty_basic, ctx_ptr_ty.as_basic_type_enum()], false);
+        let func_ctx_ty =
+            context.struct_type(&[ctx_ptr_ty.as_basic_type_enum(), i8_ptr_ty_basic], false);
+        let func_ctx_ptr_ty = func_ctx_ty.ptr_type(AddressSpace::Generic);
+        let imported_func_ty = context.struct_type(
+            &[i8_ptr_ty_basic, func_ctx_ptr_ty.as_basic_type_enum()],
+            false,
+        );
         let sigindex_ty = i32_ty;
         let rt_intrinsics_ty = i8_ty;
         let stack_lower_bound_ty = i8_ty;
@@ -588,7 +593,7 @@ pub enum GlobalCache {
 
 struct ImportedFuncCache {
     func_ptr: PointerValue,
-    ctx_ptr: PointerValue,
+    func_ctx_ptr: PointerValue,
 }
 
 pub struct CtxType<'a> {
@@ -1121,15 +1126,15 @@ impl<'a> CtxType<'a> {
             let (func_ptr_ptr, ctx_ptr_ptr) = unsafe {
                 (
                     cache_builder.build_struct_gep(imported_func_ptr, 0, "func_ptr_ptr"),
-                    cache_builder.build_struct_gep(imported_func_ptr, 1, "ctx_ptr_ptr"),
+                    cache_builder.build_struct_gep(imported_func_ptr, 1, "func_ctx_ptr_ptr"),
                 )
             };
 
             let func_ptr = cache_builder
                 .build_load(func_ptr_ptr, "func_ptr")
                 .into_pointer_value();
-            let ctx_ptr = cache_builder
-                .build_load(ctx_ptr_ptr, "ctx_ptr")
+            let func_ctx_ptr = cache_builder
+                .build_load(ctx_ptr_ptr, "func_ctx_ptr")
                 .into_pointer_value();
             tbaa_label(
                 module.clone(),
@@ -1141,15 +1146,21 @@ impl<'a> CtxType<'a> {
             tbaa_label(
                 module.clone(),
                 intrinsics,
-                "imported_func_ctx_ptr",
-                ctx_ptr.as_instruction_value().unwrap(),
+                "imported_func_func_ctx_ptr",
+                func_ctx_ptr.as_instruction_value().unwrap(),
                 Some(index.index() as u32),
             );
 
-            ImportedFuncCache { func_ptr, ctx_ptr }
+            ImportedFuncCache {
+                func_ptr,
+                func_ctx_ptr,
+            }
         });
 
-        (imported_func_cache.func_ptr, imported_func_cache.ctx_ptr)
+        (
+            imported_func_cache.func_ptr,
+            imported_func_cache.func_ctx_ptr,
+        )
     }
 
     pub fn internal_field(
