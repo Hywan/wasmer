@@ -3,15 +3,19 @@
 #![allow(unused)]
 
 use crate::ast::*;
-use wast::parser::{Cursor, Parse, Parser, Peek, Result};
+use wast::{
+    parser::{Cursor, Parse, Parser, Peek, Result},
+    Id,
+};
 
 mod kw {
     pub use wast::{
         custom_keyword,
-        kw::{anyref, export, f32, f64, i32, i64, param, result},
+        kw::{anyref, export, f32, f64, func, i32, i64, import, param, result},
     };
 
     custom_keyword!(adapt);
+    custom_keyword!(forward);
     custom_keyword!(int);
     custom_keyword!(float);
     custom_keyword!(any);
@@ -153,6 +157,12 @@ impl<'a> Parse<'a> for Interface<'a> {
 
                 if lookahead.peek::<kw::export>() {
                     Ok(Interface::Export(parser.parse()?))
+                } else if lookahead.peek::<kw::func>() {
+                    Ok(Interface::Import(parser.parse()?))
+                } else if lookahead.peek::<kw::adapt>() {
+                    Ok(Interface::Adapter(parser.parse()?))
+                } else if lookahead.peek::<kw::forward>() {
+                    Ok(Interface::Forward(parser.parse()?))
                 } else {
                     Err(lookahead.error())
                 }
@@ -185,6 +195,123 @@ impl<'a> Parse<'a> for Export<'a> {
             input_types,
             output_types,
         })
+    }
+}
+
+impl<'a> Parse<'a> for Import<'a> {
+    fn parse(parser: Parser<'a>) -> Result<Self> {
+        parser.parse::<kw::func>()?;
+        parser.parse::<Id>()?;
+
+        let (namespace, name) = parser.parens(|parser| {
+            parser.parse::<kw::import>()?;
+
+            Ok((parser.parse()?, parser.parse()?))
+        })?;
+        let mut input_types = vec![];
+        let mut output_types = vec![];
+
+        while !parser.is_empty() {
+            let function_type = parser.parse::<FunctionType>()?;
+
+            match function_type {
+                FunctionType::Input(mut inputs) => input_types.append(&mut inputs),
+                FunctionType::Output(mut outputs) => output_types.append(&mut outputs),
+            }
+        }
+
+        Ok(Import {
+            namespace,
+            name,
+            input_types,
+            output_types,
+        })
+    }
+}
+
+impl<'a> Parse<'a> for Adapter<'a> {
+    fn parse(parser: Parser<'a>) -> Result<Self> {
+        parser.parse::<kw::adapt>()?;
+
+        let (kind, namespace, name) = parser.parens(|parser| {
+            let mut lookahead = parser.lookahead1();
+
+            if lookahead.peek::<kw::import>() {
+                parser.parse::<kw::import>()?;
+
+                Ok((AdapterKind::Import, parser.parse()?, parser.parse()?))
+            } else if lookahead.peek::<kw::export>() {
+                parser.parse::<kw::export>()?;
+
+                Ok((AdapterKind::Export, "", parser.parse()?))
+            } else {
+                Err(lookahead.error())
+            }
+        })?;
+        let mut input_types = vec![];
+        let mut output_types = vec![];
+
+        while !parser.is_empty() {
+            let function_type = parser.parse::<FunctionType>()?;
+
+            match function_type {
+                FunctionType::Input(mut inputs) => input_types.append(&mut inputs),
+                FunctionType::Output(mut outputs) => output_types.append(&mut outputs),
+            }
+        }
+
+        Ok(match kind {
+            AdapterKind::Import => Adapter::Import {
+                namespace,
+                name,
+                input_types,
+                output_types,
+                instructions: vec![],
+            },
+
+            AdapterKind::Export => Adapter::Export {
+                name,
+                input_types,
+                output_types,
+                instructions: vec![],
+            },
+
+            _ => unimplemented!("Adapter of kind “helper” is not implemented yet."),
+        })
+    }
+}
+
+impl<'a> Parse<'a> for Forward<'a> {
+    fn parse(parser: Parser<'a>) -> Result<Self> {
+        parser.parse::<kw::forward>()?;
+
+        let name = parser.parens(|parser| {
+            parser.parse::<kw::export>()?;
+
+            Ok((parser.parse()?))
+        })?;
+
+        Ok(Forward { name })
+    }
+}
+
+impl<'a> Parse<'a> for Interfaces<'a> {
+    fn parse(parser: Parser<'a>) -> Result<Self> {
+        let mut interfaces: Interfaces = Default::default();
+
+        while !parser.is_empty() {
+            let interface = parser.parse::<Interface>()?;
+
+            match interface {
+                Interface::Export(export) => interfaces.exports.push(export),
+                Interface::Type(ty) => interfaces.types.push(ty),
+                Interface::Import(import) => interfaces.imports.push(import),
+                Interface::Adapter(adapter) => interfaces.adapters.push(adapter),
+                Interface::Forward(forward) => interfaces.forwards.push(forward),
+            }
+        }
+
+        Ok(interfaces)
     }
 }
 
@@ -310,98 +437,161 @@ mod tests {
         assert_eq!(parser::parse::<Interface>(&input).unwrap(), output);
     }
 
-    /*
     #[test]
     fn test_import_with_no_param_no_result() {
-        let input = r#"(@interface func $ns_foo (import "ns" "foo"))"#;
-        let output = Import {
+        let input = buffer(r#"(@interface func $ns_foo (import "ns" "foo"))"#);
+        let output = Interface::Import(Import {
             namespace: "ns",
             name: "foo",
             input_types: vec![],
             output_types: vec![],
-        };
+        });
 
-        assert_eq!(import::<()>(input), Ok(("", output)));
-    }
-
-    #[test]
-    fn test_import_with_no_index_variable_no_param_no_result() {
-        let input = r#"(@interface func (import "ns" "foo"))"#;
-        let output = Import {
-            namespace: "ns",
-            name: "foo",
-            input_types: vec![],
-            output_types: vec![],
-        };
-
-        assert_eq!(import::<()>(input), Ok(("", output)));
+        assert_eq!(parser::parse::<Interface>(&input).unwrap(), output);
     }
 
     #[test]
     fn test_import_with_some_param_no_result() {
-        let input = r#"(@interface func $ns_foo (import "ns" "foo") (param i32))"#;
-        let output = Import {
+        let input = buffer(r#"(@interface func $ns_foo (import "ns" "foo") (param i32))"#);
+        let output = Interface::Import(Import {
             namespace: "ns",
             name: "foo",
             input_types: vec![InterfaceType::I32],
             output_types: vec![],
-        };
+        });
 
-        assert_eq!(import::<()>(input), Ok(("", output)));
+        assert_eq!(parser::parse::<Interface>(&input).unwrap(), output);
     }
 
     #[test]
     fn test_import_with_no_param_some_result() {
-        let input = r#"(@interface func $ns_foo (import "ns" "foo") (result i32))"#;
-        let output = Import {
+        let input = buffer(r#"(@interface func $ns_foo (import "ns" "foo") (result i32))"#);
+        let output = Interface::Import(Import {
             namespace: "ns",
             name: "foo",
             input_types: vec![],
             output_types: vec![InterfaceType::I32],
-        };
+        });
 
-        assert_eq!(import::<()>(input), Ok(("", output)));
+        assert_eq!(parser::parse::<Interface>(&input).unwrap(), output);
     }
 
     #[test]
     fn test_import_with_some_param_some_result() {
-        let input =
-            r#"(@interface func $ns_foo (import "ns" "foo") (param String) (result i32 i32))"#;
-        let output = Import {
+        let input = buffer(
+            r#"(@interface func $ns_foo (import "ns" "foo") (param string) (result i32 i32))"#,
+        );
+        let output = Interface::Import(Import {
             namespace: "ns",
             name: "foo",
             input_types: vec![InterfaceType::String],
             output_types: vec![InterfaceType::I32, InterfaceType::I32],
-        };
+        });
 
-        assert_eq!(import::<()>(input), Ok(("", output)));
+        assert_eq!(parser::parse::<Interface>(&input).unwrap(), output);
     }
 
     #[test]
     fn test_adapter_import() {
-        let input = r#"(@interface adapt (import "ns" "foo") (param i32 i32) (result i32))"#;
-        let output = Adapter::Import {
+        let input =
+            buffer(r#"(@interface adapt (import "ns" "foo") (param i32 i32) (result i32))"#);
+        let output = Interface::Adapter(Adapter::Import {
             namespace: "ns",
             name: "foo",
             input_types: vec![InterfaceType::I32, InterfaceType::I32],
             output_types: vec![InterfaceType::I32],
             instructions: vec![],
-        };
+        });
 
-        assert_eq!(adapter::<()>(input), Ok(("", output)));
+        assert_eq!(parser::parse::<Interface>(&input).unwrap(), output);
     }
 
     #[test]
     fn test_adapter_export() {
-        let input = r#"(@interface adapt (export "foo") (param i32 i32) (result i32))"#;
-        let output = Adapter::Export {
+        let input = buffer(r#"(@interface adapt (export "foo") (param i32 i32) (result i32))"#);
+        let output = Interface::Adapter(Adapter::Export {
             name: "foo",
             input_types: vec![InterfaceType::I32, InterfaceType::I32],
             output_types: vec![InterfaceType::I32],
             instructions: vec![],
+        });
+
+        assert_eq!(parser::parse::<Interface>(&input).unwrap(), output);
+    }
+    #[test]
+    fn test_forward() {
+        let input = buffer(r#"(@interface forward (export "foo"))"#);
+        let output = Interface::Forward(Forward { name: "foo" });
+
+        assert_eq!(parser::parse::<Interface>(&input).unwrap(), output);
+    }
+
+    #[test]
+    fn test_interfaces() {
+        let input = buffer(
+            r#"(@interface export "foo"
+  (param i32))
+
+(@interface export "bar")
+
+(@interface func $ns_foo (import "ns" "foo")
+  (result i32))
+
+(@interface func $ns_bar (import "ns" "bar"))
+
+(@interface adapt (import "ns" "foo")
+  (param i32))
+
+(@interface adapt (export "bar"))
+
+(@interface forward (export "main"))"#,
+        );
+        let output = Interfaces {
+            exports: vec![
+                Export {
+                    name: "foo",
+                    input_types: vec![InterfaceType::I32],
+                    output_types: vec![],
+                },
+                Export {
+                    name: "bar",
+                    input_types: vec![],
+                    output_types: vec![],
+                },
+            ],
+            types: vec![],
+            imports: vec![
+                Import {
+                    namespace: "ns",
+                    name: "foo",
+                    input_types: vec![],
+                    output_types: vec![InterfaceType::I32],
+                },
+                Import {
+                    namespace: "ns",
+                    name: "bar",
+                    input_types: vec![],
+                    output_types: vec![],
+                },
+            ],
+            adapters: vec![
+                Adapter::Import {
+                    namespace: "ns",
+                    name: "foo",
+                    input_types: vec![InterfaceType::I32],
+                    output_types: vec![],
+                    instructions: vec![],
+                },
+                Adapter::Export {
+                    name: "bar",
+                    input_types: vec![],
+                    output_types: vec![],
+                    instructions: vec![],
+                },
+            ],
+            forwards: vec![Forward { name: "main" }],
         };
 
-        assert_eq!(adapter::<()>(input), Ok(("", output)));
+        assert_eq!(parser::parse::<Interfaces>(&input).unwrap(), output);
     }
-    */
 }
