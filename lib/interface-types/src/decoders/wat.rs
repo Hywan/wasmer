@@ -12,11 +12,62 @@ mod kw {
     };
 
     custom_keyword!(adapt);
-    custom_keyword!(Int);
-    custom_keyword!(Float);
-    custom_keyword!(Any);
-    custom_keyword!(String);
-    custom_keyword!(Seq);
+    custom_keyword!(int);
+    custom_keyword!(float);
+    custom_keyword!(any);
+    custom_keyword!(string);
+    custom_keyword!(seq);
+}
+
+/// Issue: Uppercased keyword aren't supported for the moment.
+impl Parse<'_> for InterfaceType {
+    fn parse(parser: Parser<'_>) -> Result<Self> {
+        let mut lookahead = parser.lookahead1();
+
+        if lookahead.peek::<kw::int>() {
+            parser.parse::<kw::int>()?;
+
+            Ok(InterfaceType::Int)
+        } else if lookahead.peek::<kw::float>() {
+            parser.parse::<kw::float>()?;
+
+            Ok(InterfaceType::Float)
+        } else if lookahead.peek::<kw::any>() {
+            parser.parse::<kw::any>()?;
+
+            Ok(InterfaceType::Any)
+        } else if lookahead.peek::<kw::string>() {
+            parser.parse::<kw::string>()?;
+
+            Ok(InterfaceType::String)
+        } else if lookahead.peek::<kw::seq>() {
+            parser.parse::<kw::seq>()?;
+
+            Ok(InterfaceType::Seq)
+        } else if lookahead.peek::<kw::i32>() {
+            parser.parse::<kw::i32>()?;
+
+            Ok(InterfaceType::I32)
+        } else if lookahead.peek::<kw::i64>() {
+            parser.parse::<kw::i64>()?;
+
+            Ok(InterfaceType::I64)
+        } else if lookahead.peek::<kw::f32>() {
+            parser.parse::<kw::f32>()?;
+
+            Ok(InterfaceType::F32)
+        } else if lookahead.peek::<kw::f64>() {
+            parser.parse::<kw::f64>()?;
+
+            Ok(InterfaceType::F64)
+        } else if lookahead.peek::<kw::anyref>() {
+            parser.parse::<kw::anyref>()?;
+
+            Ok(InterfaceType::AnyRef)
+        } else {
+            Err(lookahead.error())
+        }
+    }
 }
 
 struct AtInterface;
@@ -44,36 +95,6 @@ impl Parse<'_> for AtInterface {
 }
 
 #[derive(PartialEq, Debug)]
-enum Interface<'a> {
-    Export(Export<'a>),
-    Type(Type<'a>),
-    Import(Import<'a>),
-    Adapter(Adapter<'a>),
-    Forward(Forward<'a>),
-}
-
-impl<'a> Parse<'a> for Interface<'a> {
-    fn parse(parser: Parser<'a>) -> Result<Self> {
-        parser.parens(|parser| {
-            let mut lookahead = parser.lookahead1();
-
-            if lookahead.peek::<AtInterface>() {
-                parser.parse::<AtInterface>()?;
-
-                let mut lookahead = parser.lookahead1();
-
-                if lookahead.peek::<kw::export>() {
-                    Ok(Interface::Export(parser.parse()?))
-                } else {
-                    Err(lookahead.error())
-                }
-            } else {
-                Err(lookahead.error())
-            }
-        })
-    }
-}
-
 enum FunctionType {
     Input(Vec<InterfaceType>),
     Output(Vec<InterfaceType>),
@@ -111,6 +132,37 @@ impl Parse<'_> for FunctionType {
     }
 }
 
+#[derive(PartialEq, Debug)]
+enum Interface<'a> {
+    Export(Export<'a>),
+    Type(Type<'a>),
+    Import(Import<'a>),
+    Adapter(Adapter<'a>),
+    Forward(Forward<'a>),
+}
+
+impl<'a> Parse<'a> for Interface<'a> {
+    fn parse(parser: Parser<'a>) -> Result<Self> {
+        parser.parens(|parser| {
+            let mut lookahead = parser.lookahead1();
+
+            if lookahead.peek::<AtInterface>() {
+                parser.parse::<AtInterface>()?;
+
+                let mut lookahead = parser.lookahead1();
+
+                if lookahead.peek::<kw::export>() {
+                    Ok(Interface::Export(parser.parse()?))
+                } else {
+                    Err(lookahead.error())
+                }
+            } else {
+                Err(lookahead.error())
+            }
+        })
+    }
+}
+
 impl<'a> Parse<'a> for Export<'a> {
     fn parse(parser: Parser<'a>) -> Result<Self> {
         parser.parse::<kw::export>()?;
@@ -136,80 +188,19 @@ impl<'a> Parse<'a> for Export<'a> {
     }
 }
 
-impl Parse<'_> for InterfaceType {
-    fn parse(parser: Parser<'_>) -> Result<Self> {
-        let mut lookahead = parser.lookahead1();
-
-        if lookahead.peek::<kw::Int>() {
-            parser.parse::<kw::Int>()?;
-
-            Ok(InterfaceType::Int)
-        } else if lookahead.peek::<kw::Float>() {
-            parser.parse::<kw::Float>()?;
-
-            Ok(InterfaceType::Float)
-        } else if lookahead.peek::<kw::Any>() {
-            parser.parse::<kw::Any>()?;
-
-            Ok(InterfaceType::Any)
-        } else if lookahead.peek::<kw::String>() {
-            parser.parse::<kw::String>()?;
-
-            Ok(InterfaceType::String)
-        } else if lookahead.peek::<kw::Seq>() {
-            parser.parse::<kw::Seq>()?;
-
-            Ok(InterfaceType::Seq)
-        } else if lookahead.peek::<kw::i32>() {
-            parser.parse::<kw::i32>()?;
-
-            Ok(InterfaceType::I32)
-        } else if lookahead.peek::<kw::i64>() {
-            parser.parse::<kw::i64>()?;
-
-            Ok(InterfaceType::I64)
-        } else if lookahead.peek::<kw::f32>() {
-            parser.parse::<kw::f32>()?;
-
-            Ok(InterfaceType::F32)
-        } else if lookahead.peek::<kw::f64>() {
-            parser.parse::<kw::f64>()?;
-
-            Ok(InterfaceType::F64)
-        } else if lookahead.peek::<kw::anyref>() {
-            parser.parse::<kw::anyref>()?;
-
-            Ok(InterfaceType::AnyRef)
-        } else {
-            Err(lookahead.error())
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use wast::parser::{self, ParseBuffer};
 
-    #[test]
-    fn test_foo() {
-        let input = r#"(@interface export "foo" (param i32 i64) (result i32))"#;
-        let output = Interface::Export(Export {
-            name: "foo",
-            input_types: vec![InterfaceType::I32, InterfaceType::I64],
-            output_types: vec![InterfaceType::I32],
-        });
-
-        let buffer = ParseBuffer::new(input).expect("Failed to build the parser buffer.");
-
-        assert_eq!(parser::parse::<Interface>(&buffer).unwrap(), output);
+    fn buffer(input: &str) -> ParseBuffer {
+        ParseBuffer::new(input).expect("Failed to build the parser buffer.")
     }
 
-    /*
     #[test]
     fn test_interface_type() {
         let inputs = vec![
-            "Int", "Float", "Any", "String", "Seq", "i32", "i64", "f32", "f64", "anyref",
+            "int", "float", "any", "string", "seq", "i32", "i64", "f32", "f64", "anyref",
         ];
         let outputs = vec![
             InterfaceType::Int,
@@ -227,118 +218,99 @@ mod tests {
         assert_eq!(inputs.len(), outputs.len());
 
         for (nth, input) in inputs.iter().enumerate() {
-            assert_eq!(interface_type::<()>(input), Ok(("", outputs[nth])));
+            assert_eq!(
+                parser::parse::<InterfaceType>(&buffer(input)).unwrap(),
+                outputs[nth]
+            );
         }
     }
 
     #[test]
     fn test_param_empty() {
-        let input = "(param)";
-        let output = vec![];
+        let input = buffer("(param)");
+        let output = FunctionType::Input(vec![]);
 
-        assert_eq!(param::<()>(input), Ok(("", output)));
+        assert_eq!(parser::parse::<FunctionType>(&input).unwrap(), output);
     }
 
     #[test]
     fn test_param() {
-        let input = "(param i32 String)";
-        let output = vec![InterfaceType::I32, InterfaceType::String];
+        let input = buffer("(param i32 string)");
+        let output = FunctionType::Input(vec![InterfaceType::I32, InterfaceType::String]);
 
-        assert_eq!(param::<()>(input), Ok(("", output)));
+        assert_eq!(parser::parse::<FunctionType>(&input).unwrap(), output);
     }
 
     #[test]
     fn test_result_empty() {
-        let input = "(result)";
-        let output = vec![];
+        let input = buffer("(result)");
+        let output = FunctionType::Output(vec![]);
 
-        assert_eq!(result::<()>(input), Ok(("", output)));
+        assert_eq!(parser::parse::<FunctionType>(&input).unwrap(), output);
     }
 
     #[test]
     fn test_result() {
-        let input = "(result i32 String)";
-        let output = vec![InterfaceType::I32, InterfaceType::String];
+        let input = buffer("(result i32 string)");
+        let output = FunctionType::Output(vec![InterfaceType::I32, InterfaceType::String]);
 
-        assert_eq!(result::<()>(input), Ok(("", output)));
+        assert_eq!(parser::parse::<FunctionType>(&input).unwrap(), output);
     }
 
     #[test]
     fn test_export_with_no_param_no_result() {
-        let input = r#"(@interface export "foo")"#;
-        let output = Export {
-            name: "foo",
-            input_types: vec![],
-            output_types: vec![],
-        };
-
-        assert_eq!(export::<()>(input), Ok(("", output)));
+        let input = buffer(r#"(@interface export "foo")"#);
     }
 
     #[test]
     fn test_export_with_some_param_no_result() {
-        let input = r#"(@interface export "foo" (param i32))"#;
-        let output = Export {
+        let input = buffer(r#"(@interface export "foo" (param i32))"#);
+        let output = Interface::Export(Export {
             name: "foo",
             input_types: vec![InterfaceType::I32],
             output_types: vec![],
-        };
+        });
 
-        assert_eq!(export::<()>(input), Ok(("", output)));
+        assert_eq!(parser::parse::<Interface>(&input).unwrap(), output);
     }
 
     #[test]
     fn test_export_with_no_param_some_result() {
-        let input = r#"(@interface export "foo" (result i32))"#;
-        let output = Export {
+        let input = buffer(r#"(@interface export "foo" (result i32))"#);
+        let output = Interface::Export(Export {
             name: "foo",
             input_types: vec![],
             output_types: vec![InterfaceType::I32],
-        };
+        });
 
-        assert_eq!(export::<()>(input), Ok(("", output)));
+        assert_eq!(parser::parse::<Interface>(&input).unwrap(), output);
     }
 
     #[test]
     fn test_export_with_some_param_some_result() {
-        let input = r#"(@interface export "foo" (param String) (result i32 i32))"#;
-        let output = Export {
+        let input = buffer(r#"(@interface export "foo" (param string) (result i32 i32))"#);
+        let output = Interface::Export(Export {
             name: "foo",
             input_types: vec![InterfaceType::String],
             output_types: vec![InterfaceType::I32, InterfaceType::I32],
-        };
+        });
 
-        assert_eq!(export::<()>(input), Ok(("", output)));
+        assert_eq!(parser::parse::<Interface>(&input).unwrap(), output);
     }
 
     #[test]
     fn test_export_escaped_name() {
-        let input = r#"(@interface export "fo\"o")"#;
-        let output = Export {
-            name: r#"fo\"o"#,
+        let input = buffer(r#"(@interface export "fo\"o")"#);
+        let output = Interface::Export(Export {
+            name: r#"fo"o"#,
             input_types: vec![],
             output_types: vec![],
-        };
+        });
 
-        assert_eq!(export::<()>(input), Ok(("", output)));
+        assert_eq!(parser::parse::<Interface>(&input).unwrap(), output);
     }
 
-    #[test]
-    fn test_import_qualifier() {
-        let input = r#"(import "ns" "name")"#;
-        let output = ("ns", "name");
-
-        assert_eq!(import_qualifier::<()>(input), Ok(("", output)));
-    }
-
-    #[test]
-    fn test_export_qualifier() {
-        let input = r#"(export "name")"#;
-        let output = "name";
-
-        assert_eq!(export_qualifier::<()>(input), Ok(("", output)));
-    }
-
+    /*
     #[test]
     fn test_import_with_no_param_no_result() {
         let input = r#"(@interface func $ns_foo (import "ns" "foo"))"#;
