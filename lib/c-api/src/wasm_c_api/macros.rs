@@ -24,6 +24,13 @@ macro_rules! wasm_declare_vec {
                 pub data: *mut [<wasm_ $name _t>],
             }
 
+            impl crate::wasm_c_api::own::Owned for [<wasm_ $name _vec_t>] {
+                fn delete(&mut self) {
+                    let destructor: unsafe extern "C" fn(_: Option<&mut [<wasm_ $name _vec_t>]>) = [<wasm_ $name _vec_delete>];
+                    unsafe { destructor(Some(self)) };
+                }
+            }
+
             impl<'a> From<Vec<[<wasm_ $name _t>]>> for [<wasm_ $name _vec_t>] {
                 fn from(other: Vec<[<wasm_ $name _t>]>) -> Self {
                     let mut boxed_slice = other.into_boxed_slice();
@@ -102,8 +109,8 @@ macro_rules! wasm_declare_vec {
 
 
             #[no_mangle]
-            pub unsafe extern "C" fn [<wasm_ $name _vec_delete>](ptr: Option<&mut [<wasm_ $name _vec_t>]>) {
-                if let Some(vec) = ptr {
+            pub unsafe extern "C" fn [<wasm_ $name _vec_delete>](vec: Option<&mut [<wasm_ $name _vec_t>]>) {
+                if let Some(vec) = vec {
                     if !vec.data.is_null() {
                         Vec::from_raw_parts(vec.data, vec.size, vec.size);
                         vec.data = ::std::ptr::null_mut();
@@ -127,6 +134,13 @@ macro_rules! wasm_declare_boxed_vec {
             pub struct [<wasm_ $name _vec_t>] {
                 pub size: usize,
                 pub data: *mut *mut [<wasm_ $name _t>],
+            }
+
+            impl crate::wasm_c_api::own::Owned for [<wasm_ $name _vec_t>] {
+                fn delete(&mut self) {
+                    let destructor: unsafe extern "C" fn(_: Option<&mut [<wasm_ $name _vec_t>]>) = [<wasm_ $name _vec_delete>];
+                    unsafe { destructor(Some(self)) };
+                }
             }
 
             impl<'a> From<Vec<Box<[<wasm_ $name _t>]>>> for [<wasm_ $name _vec_t>] {
@@ -181,13 +195,14 @@ macro_rules! wasm_declare_boxed_vec {
             }
 
             #[no_mangle]
-            pub unsafe extern "C" fn [<wasm_ $name _vec_delete>](ptr: *mut [<wasm_ $name _vec_t>]) {
-                let vec = &mut *ptr;
-                if !vec.data.is_null() {
-                    let data: Vec<*mut [<wasm_ $name _t>]> = Vec::from_raw_parts(vec.data, vec.size, vec.size);
-                    let _data: Vec<Box<[<wasm_ $name _t>]>> = ::std::mem::transmute(data);
-                    vec.data = ::std::ptr::null_mut();
-                    vec.size = 0;
+            pub unsafe extern "C" fn [<wasm_ $name _vec_delete>](vec: Option<&mut [<wasm_ $name _vec_t>]>) {
+                if let Some(vec) = vec {
+                    if !vec.data.is_null() {
+                        let data: Vec<*mut [<wasm_ $name _t>]> = Vec::from_raw_parts(vec.data, vec.size, vec.size);
+                        let _data: Vec<Box<[<wasm_ $name _t>]>> = ::std::mem::transmute(data);
+                        vec.data = ::std::ptr::null_mut();
+                        vec.size = 0;
+                    }
                 }
             }
         }
@@ -224,9 +239,7 @@ macro_rules! wasm_declare_own {
             pub struct [<wasm_ $name _t>] {}
 
             #[no_mangle]
-            pub extern "C" fn [<wasm_ $name _delete>](_arg: *mut [<wasm_ $name _t>]) {
-                todo!("in generated delete")
-            }
+            pub extern "C" fn [<wasm_ $name _delete>](_: Option<&mut [<wasm_ $name _t>]>) { }
         }
     };
 }

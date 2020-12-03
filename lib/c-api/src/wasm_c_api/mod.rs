@@ -15,6 +15,9 @@ pub mod instance;
 pub mod module;
 
 /// cbindgen:ignore
+mod own;
+
+/// cbindgen:ignore
 pub mod store;
 
 /// cbindgen:ignore

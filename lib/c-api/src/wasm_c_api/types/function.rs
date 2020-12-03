@@ -1,14 +1,13 @@
-use super::{
-    wasm_externtype_t, wasm_valtype_t, wasm_valtype_vec_delete, wasm_valtype_vec_t, WasmExternType,
-};
+use super::{wasm_externtype_t, wasm_valtype_t, wasm_valtype_vec_t, WasmExternType};
+use crate::wasm_c_api::own::Own;
 use std::mem;
 use wasmer::{ExternType, FunctionType, ValType};
 
 #[derive(Debug)]
 pub(crate) struct WasmFunctionType {
     pub(crate) function_type: FunctionType,
-    params: Box<wasm_valtype_vec_t>,
-    results: Box<wasm_valtype_vec_t>,
+    params: Own<wasm_valtype_vec_t>,
+    results: Own<wasm_valtype_vec_t>,
 }
 
 impl WasmFunctionType {
@@ -23,7 +22,7 @@ impl WasmFunctionType {
                 .map(Box::into_raw)
                 .collect::<Vec<*mut wasm_valtype_t>>();
 
-            let valtypes_vec = Box::new(wasm_valtype_vec_t {
+            let valtypes_vec = Own::new(wasm_valtype_vec_t {
                 size: valtypes.len(),
                 data: valtypes.as_mut_ptr(),
             });
@@ -42,7 +41,7 @@ impl WasmFunctionType {
                 .map(Box::into_raw)
                 .collect::<Vec<*mut wasm_valtype_t>>();
 
-            let valtypes_vec = Box::new(wasm_valtype_vec_t {
+            let valtypes_vec = Own::new(wasm_valtype_vec_t {
                 size: valtypes.len(),
                 data: valtypes.as_mut_ptr(),
             });
@@ -94,8 +93,8 @@ wasm_declare_vec!(functype);
 
 #[no_mangle]
 pub unsafe extern "C" fn wasm_functype_new(
-    params: Option<Box<wasm_valtype_vec_t>>,
-    results: Option<Box<wasm_valtype_vec_t>>,
+    params: Option<Own<wasm_valtype_vec_t>>,
+    results: Option<Own<wasm_valtype_vec_t>>,
 ) -> Option<Box<wasm_functype_t>> {
     let params = params?;
     let results = results?;
@@ -111,8 +110,8 @@ pub unsafe extern "C" fn wasm_functype_new(
         .map(|val| val.as_ref().into())
         .collect::<Vec<_>>();
 
-    wasm_valtype_vec_delete(Box::into_raw(params));
-    wasm_valtype_vec_delete(Box::into_raw(results));
+    Own::drop_value(params);
+    Own::drop_value(results);
 
     Some(Box::new(wasm_functype_t::new(FunctionType::new(
         params_as_valtype,
