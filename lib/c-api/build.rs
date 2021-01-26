@@ -61,6 +61,10 @@ macro_rules! map_feature_as_c_define {
 }
 
 fn main() {
+    if env::var("_CBINDGEN_IS_RUNNING").is_ok() {
+        return;
+    }
+
     let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let out_dir = env::var("OUT_DIR").unwrap();
 
@@ -237,7 +241,7 @@ fn add_wasmer_version(pre_header: &mut String) {
 
 /// Create a fresh new `Builder`, already pre-configured.
 fn new_builder(language: Language, crate_dir: &str, include_guard: &str, header: &str) -> Builder {
-    Builder::new()
+    let builder = Builder::new()
         .with_config(cbindgen::Config {
             sort_by: cbindgen::SortKey::Name,
             ..cbindgen::Config::default()
@@ -247,12 +251,18 @@ fn new_builder(language: Language, crate_dir: &str, include_guard: &str, header:
         .with_include_guard(include_guard)
         .with_header(header)
         .with_documentation(true)
+        .with_parse_expand(&[env::var("CARGO_PKG_NAME").unwrap()])
         .with_define("target_family", "windows", "_WIN32")
         .with_define("target_arch", "x86_64", "ARCH_X86_64")
         .with_define("feature", "jit", JIT_FEATURE_AS_C_DEFINE)
         .with_define("feature", "compiler", COMPILER_FEATURE_AS_C_DEFINE)
         .with_define("feature", "wasi", WASI_FEATURE_AS_C_DEFINE)
-        .with_define("feature", "emscripten", EMSCRIPTEN_FEATURE_AS_C_DEFINE)
+        .with_define("feature", "emscripten", EMSCRIPTEN_FEATURE_AS_C_DEFINE);
+
+    #[cfg(feature = "system-libffi")]
+    let builder = builder.with_parse_expand_features(&["system-libffi"]);
+
+    builder
 }
 
 /// Exclude types and functions from the `deprecated` API.
@@ -402,12 +412,12 @@ fn exclude_items_from_wasm_c_api(builder: Builder) -> Builder {
     builder
         .exclude_item("wasi_config_arg")
         .exclude_item("wasi_config_env")
-        .exclude_item("wasi_config_mapdir")
-        .exclude_item("wasi_config_preopen_dir")
         .exclude_item("wasi_config_inherit_stderr")
         .exclude_item("wasi_config_inherit_stdin")
         .exclude_item("wasi_config_inherit_stdout")
+        .exclude_item("wasi_config_mapdir")
         .exclude_item("wasi_config_new")
+        .exclude_item("wasi_config_preopen_dir")
         .exclude_item("wasi_config_t")
         .exclude_item("wasi_env_delete")
         .exclude_item("wasi_env_new")
@@ -417,14 +427,23 @@ fn exclude_items_from_wasm_c_api(builder: Builder) -> Builder {
         .exclude_item("wasi_env_set_memory")
         .exclude_item("wasi_env_t")
         .exclude_item("wasi_get_imports")
-        .exclude_item("wasi_get_imports_inner")
         .exclude_item("wasi_get_start_function")
+        .exclude_item("wasi_get_unordered_imports")
         .exclude_item("wasi_get_wasi_version")
         .exclude_item("wasi_version_t")
         .exclude_item("wasm_config_set_compiler")
         .exclude_item("wasm_config_set_engine")
         .exclude_item("wasm_module_name")
         .exclude_item("wasm_module_set_name")
+        .exclude_item("wasm_named_extern_module")
+        .exclude_item("wasm_named_extern_name")
+        .exclude_item("wasm_named_extern_t")
+        .exclude_item("wasm_named_extern_unwrap")
+        .exclude_item("wasm_named_extern_vec_copy")
+        .exclude_item("wasm_named_extern_vec_delete")
+        .exclude_item("wasm_named_extern_vec_new")
+        .exclude_item("wasm_named_extern_vec_new_empty")
+        .exclude_item("wasm_named_extern_vec_new_uninitialized")
         .exclude_item("wasmer_compiler_t")
         .exclude_item("wasmer_engine_t")
         .exclude_item("wat2wasm")

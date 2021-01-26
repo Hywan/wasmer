@@ -164,6 +164,28 @@ typedef struct wasi_env_t wasi_env_t;
 #endif
 
 #if defined(WASMER_WASI_ENABLED)
+/**
+ * Non-standard type wrapping `wasm_extern_t` with the addition of
+ * two `wasm_name_t` respectively for the module name and the name of
+ * the extern (very likely to be an import). This non-standard type
+ * is used by the non-standard `wasi_get_unordered_imports` function.
+ */
+typedef struct wasm_named_extern_t wasm_named_extern_t;
+#endif
+
+#if defined(WASMER_WASI_ENABLED)
+/**
+ *Represents a vector of `wasm_named_extern_t`.
+ *
+ *Read the documentation of [`wasm_named_extern_t`] to see more concrete examples.
+ */
+typedef struct {
+  uintptr_t size;
+  wasm_named_extern_t **data;
+} wasm_named_extern_vec_t;
+#endif
+
+#if defined(WASMER_WASI_ENABLED)
 void wasi_config_arg(wasi_config_t *config, const char *arg);
 #endif
 
@@ -232,7 +254,10 @@ void wasi_env_set_memory(wasi_env_t *env, const wasm_memory_t *memory);
 
 #if defined(WASMER_WASI_ENABLED)
 /**
- * Takes ownership of `wasi_env_t`.
+ * Non-standard function to get the imports needed for the WASI
+ * implementation ordered as expected by the `wasm_module_t`.
+ *
+ * This function takes ownership of `wasm_env_t`.
  */
 bool wasi_get_imports(const wasm_store_t *store,
                       const wasm_module_t *module,
@@ -242,6 +267,21 @@ bool wasi_get_imports(const wasm_store_t *store,
 
 #if defined(WASMER_WASI_ENABLED)
 wasm_func_t *wasi_get_start_function(wasm_instance_t *instance);
+#endif
+
+#if defined(WASMER_WASI_ENABLED)
+/**
+ * Non-standard function to get the imports needed for the WASI
+ * implementation with no particular order. Each import has its
+ * associated module name and name, so that it can be re-order later
+ * based on the `wasm_module_t` requirements.
+ *
+ * This function takes ownership of `wasm_env_t`.
+ */
+bool wasi_get_unordered_imports(const wasm_store_t *store,
+                                const wasm_module_t *module,
+                                const wasi_env_t *wasi_env,
+                                wasm_named_extern_vec_t *imports);
 #endif
 
 #if defined(WASMER_WASI_ENABLED)
@@ -445,6 +485,88 @@ void wasm_module_name(const wasm_module_t *module, wasm_name_t *out);
  * ```
  */
 bool wasm_module_set_name(wasm_module_t *module, const wasm_name_t *name);
+
+#if defined(WASMER_WASI_ENABLED)
+/**
+ * Non-standard function to get the module name of a
+ * `wasm_named_extern_t`.
+ */
+const wasm_name_t *wasm_named_extern_module(const wasm_named_extern_t *named_extern);
+#endif
+
+#if defined(WASMER_WASI_ENABLED)
+/**
+ * Non-standard function to get the name of a `wasm_named_extern_t`.
+ */
+const wasm_name_t *wasm_named_extern_name(const wasm_named_extern_t *named_extern);
+#endif
+
+#if defined(WASMER_WASI_ENABLED)
+/**
+ * Non-standard function to get the wrapped extern of a
+ * `wasm_named_extern_t`.
+ */
+const wasm_extern_t *wasm_named_extern_unwrap(const wasm_named_extern_t *named_extern);
+#endif
+
+#if defined(WASMER_WASI_ENABLED)
+/**
+ *Performs a deep copy of a vector of [`wasm_named_extern_t`].
+ */
+void wasm_named_extern_vec_copy(wasm_named_extern_vec_t *out_ptr,
+                                const wasm_named_extern_vec_t *in_ptr);
+#endif
+
+#if defined(WASMER_WASI_ENABLED)
+/**
+ *Deletes a vector of [`wasm_named_extern_t`].
+ *
+ *# Example
+ *
+ *See the [`wasm_named_extern_vec_t`] type to get an example.
+ */
+void wasm_named_extern_vec_delete(wasm_named_extern_vec_t *ptr);
+#endif
+
+#if defined(WASMER_WASI_ENABLED)
+/**
+ *Creates a new vector of [`wasm_named_extern_t`].
+ */
+void wasm_named_extern_vec_new(wasm_named_extern_vec_t *out,
+                               uintptr_t length,
+                               wasm_named_extern_t *const *init);
+#endif
+
+#if defined(WASMER_WASI_ENABLED)
+/**
+ *Creates an empty vector of [`wasm_named_extern_t`].
+ *
+ *# Example
+ *
+ *```rust # use inline_c::assert_c; # fn main() { #    (assert_c! { # #include "tests/wasmer_wasm.h" # int main() {     // Creates an empty vector of `wasm_named_extern_t`.     wasm_named_extern_vec_t vector;     wasm_named_extern_vec_new_empty(&vector);
+ *
+ *    // Check that it is empty.     assert(vector.size == 0);
+ *
+ *    // Free it.     wasm_named_extern_vec_delete(&vector); } #    }) #    .success(); # } ```
+ */
+void wasm_named_extern_vec_new_empty(wasm_named_extern_vec_t *out);
+#endif
+
+#if defined(WASMER_WASI_ENABLED)
+/**
+ *Creates a new uninitialized vector of [`wasm_named_extern_t`].
+ *
+ *# Example
+ *
+ *```rust # use inline_c::assert_c; # fn main() { #    (assert_c! { # #include "tests/wasmer_wasm.h" # int main() {     // Creates an empty vector of `wasm_named_extern_t`.     wasm_named_extern_vec_t vector;     wasm_named_extern_vec_new_uninitialized(&vector, 3);
+ *
+ *    // Check that it contains 3 items.     assert(vector.size == 3);
+ *
+ *    // Free it.     wasm_named_extern_vec_delete(&vector); } #    }) #    .success(); # } ```
+ */
+void wasm_named_extern_vec_new_uninitialized(wasm_named_extern_vec_t *out,
+                                             uintptr_t length);
+#endif
 
 /**
  * Gets the length in bytes of the last error if any, zero otherwise.
