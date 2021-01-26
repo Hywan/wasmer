@@ -449,14 +449,6 @@ bool wasm_module_set_name(wasm_module_t *module, const wasm_name_t *name);
 
 #if defined(WASMER_WASI_ENABLED)
 /**
- * Non-standard function to get the wrapped extern of a
- * `wasm_named_extern_t`.
- */
-const wasm_extern_t *wasm_named_extern_extern(const wasm_named_extern_t *named_extern);
-#endif
-
-#if defined(WASMER_WASI_ENABLED)
-/**
  * Non-standard function to get the module name of a
  * `wasm_named_extern_t`.
  */
@@ -468,6 +460,14 @@ const wasm_name_t *wasm_named_extern_module(const wasm_named_extern_t *named_ext
  * Non-standard function to get the name of a `wasm_named_extern_t`.
  */
 const wasm_name_t *wasm_named_extern_name(const wasm_named_extern_t *named_extern);
+#endif
+
+#if defined(WASMER_WASI_ENABLED)
+/**
+ * Non-standard function to get the wrapped extern of a
+ * `wasm_named_extern_t`.
+ */
+const wasm_extern_t *wasm_named_extern_unwrap(const wasm_named_extern_t *named_extern);
 #endif
 
 #if defined(WASMER_WASI_ENABLED)
